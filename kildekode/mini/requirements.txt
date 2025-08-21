@@ -1,0 +1,3 @@
+pydantic
+piexif
+Pillow
