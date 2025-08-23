@@ -47,7 +47,13 @@ def add_sourcefile(filename: str, thumbnail: Optional[bytes], exif_data: Optiona
             VALUES (?, ?, ?)
         ''', (filename, thumbnail, exif_data))
         # Return lastrowid from the connection and ignore the type checker error
-        return conn.lastrowid  # type: ignore
+                # Return lastrowid from the cursor and ignore the type checker error
+        c.execute('''
+            INSERT INTO sourcefiles (filename, thumbnail, exif_data)
+            VALUES (?, ?, ?)
+        ''', (filename, thumbnail, exif_data))
+        # Return lastrowid from the cursor
+        return c.lastrowid
 
 
 def get_sourcefile_by_id(sourcefile_id: int) -> Optional[SourceFile]:
