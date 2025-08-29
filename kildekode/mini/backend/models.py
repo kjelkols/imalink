@@ -2,11 +2,12 @@ import logging
 from pydantic import BaseModel, Field
 from typing import Optional, Tuple
 
-#from services import exif  # Import the exif service module
+from services import exif as exif_service
 
 class SourceFile(BaseModel):
     id: Optional[int] = None
     filename: str
+    image_hash: Optional[str] = None
     thumbnail: Optional[bytes] = Field(default=None, repr=False)
     exif_data: Optional[bytes] = Field(default=None, repr=False)
 

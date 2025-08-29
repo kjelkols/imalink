@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bildegalleri</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 2rem;
+            background-color: #f0f2f5;
+        }
+        h1 {
+            text-align: center;
+            color: #1c1e21;
+        }
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1rem;
+            max-width: 1200px;
+            margin: 2rem auto;
+        }
+        .gallery-item {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            text-decoration: none;
+            color: #1c1e21;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .gallery-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        }
+        .gallery-item img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            display: block;
+        }
+        .info {
+            padding: 0.75rem;
+        }
+        .info .filename {
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: block;
+        }
+        .info .date {
+            font-size: 0.8rem;
+            color: #606770;
+        }
+    </style>
+</head>
+<body>
+    <h1>Bildegalleri</h1>
+    <div class="gallery">
+        {% for image in images %}
+            <a href="{{ url_for('get_large_image', image_hash=image.image_hash) }}" target="_blank" class="gallery-item">
+                <img src="{{ url_for('get_thumbnail', sourcefile_id=image.id) }}" alt="Thumbnail for {{ image.filename }}">
+                <div class="info">
+                    <span class="filename">{{ image.filename.split('\\')[-1] }}</span>
+                    <span class="date">{{ image.taken_timestamp or 'Dato ukjent' }}</span>
+                </div>
+            </a>
+        {% else %}
+            <p>Ingen bilder funnet i databasen.</p>
+        {% endfor %}
+    </div>
+</body>
+</html>
