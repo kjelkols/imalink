@@ -2,8 +2,7 @@ import logging
 from pydantic import BaseModel, Field
 from typing import Optional, Tuple
 
-import exif_service  # Import the new service module
-
+#from services import exif  # Import the exif service module
 
 class SourceFile(BaseModel):
     id: Optional[int] = None
