@@ -8,3 +8,5 @@ COMMON_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 RAW_EXTENSIONS = {'cr2', 'nef', 'arw'}
 ALLOWED_EXTENSIONS = COMMON_EXTENSIONS.union(RAW_EXTENSIONS)
 
+if __name__ == "__main__":
+    print(f"Konfigurasjon:\nDB_PATH: {DB_PATH}\nTHUMBNAIL_SIZE: {THUMBNAIL_SIZE}\nALLOWED_EXTENSIONS: {ALLOWED_EXTENSIONS}")

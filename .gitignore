@@ -2,6 +2,7 @@
 #  These files are specific to the project and should not be shared with others.
 *.db
 morchbench/
+zkladd*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
