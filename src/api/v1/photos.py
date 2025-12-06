@@ -502,6 +502,7 @@ def create_photo(
     # Log input_channel_id from request for debugging
     input_channel_id = request.photo_create_schema.input_channel_id
     print(f"🔍 CREATE PHOTO: user_id={current_user.id}, input_channel_id={input_channel_id}, hothash={request.photo_create_schema.hothash[:16]}...")
+    print(f"🔍 PhotoCreateSchema dump: {request.photo_create_schema.model_dump(include={'input_channel_id', 'author_id', 'rating', 'visibility'})}")
     
     try:
         photo = photo_service.create_photo_from_photo_create_schema(
