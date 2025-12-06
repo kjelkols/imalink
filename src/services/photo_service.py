@@ -648,17 +648,14 @@ class PhotoService:
         
         # Validate input_channel_id if provided
         if input_channel_id is not None:
-            print(f"🔍 VALIDATING input_channel_id={input_channel_id} for user {user_id}")
             channel = channel_repo.get_channel_by_id(input_channel_id, user_id)
             if not channel:
-                print(
-                    f"⚠️  INVALID input_channel_id={input_channel_id} for user {user_id} "
+                logger.warning(
+                    f"Invalid input_channel_id={input_channel_id} for user {user_id} "
                     f"(channel does not exist or belongs to another user). "
                     f"Falling back to protected Quick Channel."
                 )
                 input_channel_id = None  # Fall back to Quick Channel
-            else:
-                print(f"✅ VALIDATED input_channel_id={input_channel_id} (title='{channel.title}') for user {user_id}")
         
         if input_channel_id is None:
             default_channel = channel_repo.get_protected_channel(user_id)
@@ -670,9 +667,6 @@ class PhotoService:
                 )
             
             input_channel_id = default_channel.id
-            print(f"📌 USING protected Quick Channel (id={input_channel_id}) for user {user_id}")
-        
-        print(f"✅ FINAL input_channel_id={input_channel_id} for photo (user {user_id})")
         
         # Resolve author_id - use user's default self-author if not provided
         author_id = schema.author_id
