@@ -2849,6 +2849,214 @@ curl -X PUT http://localhost:8000/api/v1/photos/abc123.../event \
 
 ---
 
-**Last Updated:** December 2, 2025  
-**API Version:** 3.1 (Events + PhotoCreateSchema Architecture)  
+## 📚 Photo Collections (Curated Photo Sets)
+
+Collections are flat, ordered lists of photos for curated albums, portfolios, or client deliverables. Unlike Events (hierarchical), Collections are simple many-to-many relationships.
+
+**Key Features:**
+- **Flat structure**: No hierarchy, just ordered lists
+- **Many-to-many**: Photos can be in multiple collections
+- **Ordered**: Manual sorting via `hothashes` array
+- **User-scoped**: Each user has their own collections
+- **Flexible**: Add/remove photos without affecting originals
+
+### List Collections
+
+```http
+GET /api/v1/collections/
+Authorization: Bearer {token}
+```
+
+**Query Parameters:**
+- `offset` (int, default=0): Skip N collections
+- `limit` (int, default=100, max=5000): Number of collections to return
+
+**Response:**
+```json
+{
+  "collections": [
+    {
+      "id": 1,
+      "title": "Best of 2024",
+      "description": "My favorite photos from 2024",
+      "photo_count": 45,
+      "created_at": "2024-01-15T10:30:00Z",
+      "updated_at": "2024-12-16T14:22:00Z"
+    }
+  ],
+  "total": 12
+}
+```
+
+### Get Collection Details
+
+```http
+GET /api/v1/collections/{id}
+Authorization: Bearer {token}
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "title": "Best of 2024",
+  "description": "My favorite photos from 2024",
+  "hothashes": ["abc123...", "def456...", "ghi789..."],
+  "photo_count": 45,
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-12-16T14:22:00Z"
+}
+```
+
+### Get Photos in Collection
+
+```http
+GET /api/v1/collections/{id}/photos?skip=0&limit=100
+Authorization: Bearer {token}
+```
+
+**Query Parameters:**
+- `skip` (int, default=0): Number of photos to skip
+- `limit` (int, default=100, max=5000): Number of photos to return
+
+**Response (PaginatedResponse):**
+```json
+{
+  "data": [
+    {
+      "hothash": "abc123...",
+      "width": 4000,
+      "height": 3000,
+      "rating": 4,
+      "taken_at": "2024-06-15T14:30:00Z",
+      ...
+    }
+  ],
+  "total": 45,
+  "offset": 0,
+  "limit": 100
+}
+```
+
+**Notes:**
+- Photos returned in collection order (as defined by `hothashes` array)
+- `total` is the total number of photos in the collection
+- Use pagination for large collections (thousands of photos)
+
+### Create Collection
+
+```http
+POST /api/v1/collections/
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "title": "Summer Vacation 2024",
+  "description": "Photos from our trip to Italy"
+}
+```
+
+**Response:**
+```json
+{
+  "id": 5,
+  "title": "Summer Vacation 2024",
+  "description": "Photos from our trip to Italy",
+  "hothashes": [],
+  "photo_count": 0,
+  "created_at": "2024-12-16T15:00:00Z",
+  "updated_at": "2024-12-16T15:00:00Z"
+}
+```
+
+### Update Collection
+
+```http
+PUT /api/v1/collections/{id}
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "title": "Italian Adventure 2024",
+  "description": "Updated description"
+}
+```
+
+### Delete Collection
+
+```http
+DELETE /api/v1/collections/{id}
+Authorization: Bearer {token}
+```
+
+**Notes:**
+- Deletes only the collection, not the photos
+- Returns 204 No Content on success
+
+### Add Photos to Collection
+
+```http
+POST /api/v1/collections/{id}/photos
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "hothashes": ["abc123...", "def456...", "ghi789..."]
+}
+```
+
+**Response:**
+```json
+{
+  "added": 3,
+  "skipped": 0,
+  "message": "Added 3 photos to collection"
+}
+```
+
+**Notes:**
+- Duplicates are automatically skipped
+- Photos appended to end of collection
+
+### Remove Photos from Collection
+
+```http
+DELETE /api/v1/collections/{id}/photos
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "hothashes": ["abc123...", "def456..."]
+}
+```
+
+**Response:**
+```json
+{
+  "removed": 2,
+  "message": "Removed 2 photos from collection"
+}
+```
+
+### Reorder Collection Photos
+
+```http
+PUT /api/v1/collections/{id}/photos/reorder
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "hothashes": ["ghi789...", "abc123...", "def456..."]
+}
+```
+
+**Notes:**
+- Replaces entire order - must include ALL hothashes you want to keep
+- Photos not in list are removed from collection
+- Use for drag-and-drop reordering in UI
+
+---
+
+**Last Updated:** December 16, 2025  
+**API Version:** 3.1 (Events + Collections + PhotoCreateSchema Architecture)  
 **Backend Version:** Fase 1 (Multi-User + Events + PhotoStacks + Photo-Centric API)
