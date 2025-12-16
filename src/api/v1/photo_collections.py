@@ -20,6 +20,7 @@ from src.schemas.photo_collection import (
     CollectionListResponse
 )
 from src.schemas.photo_schemas import PhotoResponse
+from src.schemas.common import PaginatedResponse
 from src.services.photo_collection_service import PhotoCollectionService
 
 
@@ -196,7 +197,7 @@ def reorder_collection_photos(
 
 @router.get(
     "/{collection_id}/photos",
-    response_model=List[PhotoResponse],
+    response_model=PaginatedResponse[PhotoResponse],
     summary="Get photos in collection"
 )
 def get_collection_photos(
@@ -212,7 +213,7 @@ def get_collection_photos(
     - **skip**: Number of photos to skip
     - **limit**: Maximum photos to return
     
-    Returns photos in collection order.
+    Returns photos in collection order with total count.
     """
     service = PhotoCollectionService(db)
     photos = service.get_collection_photos(
@@ -221,7 +222,17 @@ def get_collection_photos(
         skip, 
         limit
     )
-    return [PhotoResponse.model_validate(p) for p in photos]
+    
+    # Get total count from collection
+    collection = service.get_collection(collection_id, current_user.id)
+    total = len(collection.hothashes) if collection.hothashes else 0
+    
+    return PaginatedResponse(
+        data=[PhotoResponse.model_validate(p) for p in photos],
+        total=total,
+        offset=skip,
+        limit=limit
+    )
 
 
 @router.post(
