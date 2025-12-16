@@ -79,7 +79,7 @@ def get_input_channel(
 
 @router.get("/", response_model=InputChannelListResponse)
 def list_input_channels(
-    limit: int = Query(100, ge=1, le=1000),
+    limit: int = Query(100, ge=1, le=5000),
     offset: int = Query(0, ge=0),
     service: InputChannelService = Depends(get_input_channel_service),
     current_user: User = Depends(get_current_user)

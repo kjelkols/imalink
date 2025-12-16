@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 @router.get("/", response_model=PaginatedResponse[PhotoResponse])
 def list_photos(
     offset: int = Query(0, ge=0, description="Number of photos to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Number of photos to return"),
+    limit: int = Query(100, ge=1, le=5000, description="Number of photos to return"),
     author_id: Optional[int] = Query(None, description="Filter by author ID"),
     current_user: Optional[User] = Depends(get_optional_current_user),
     photo_service: PhotoService = Depends(get_photo_service)

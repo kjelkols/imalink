@@ -81,7 +81,7 @@ def create_saved_search(
 @router.get("/", response_model=SavedPhotoSearchListResponse)
 def list_saved_searches(
     offset: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
+    limit: int = Query(100, ge=1, le=5000),
     favorites_only: bool = Query(False, description="Show only favorite searches"),
     current_user: User = Depends(get_current_user),
     service: PhotoSearchService = Depends(get_photo_search_service)
@@ -158,7 +158,7 @@ def delete_saved_search(
 def execute_saved_search(
     search_id: int,
     override_offset: Optional[int] = Query(None, ge=0, description="Override pagination offset"),
-    override_limit: Optional[int] = Query(None, ge=1, le=1000, description="Override pagination limit"),
+    override_limit: Optional[int] = Query(None, ge=1, le=5000, description="Override pagination limit"),
     current_user: User = Depends(get_current_user),
     service: PhotoSearchService = Depends(get_photo_search_service)
 ):

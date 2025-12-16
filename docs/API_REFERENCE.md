@@ -215,7 +215,7 @@ Authorization: Bearer <token>  # Optional - omit for anonymous access to public 
 
 **Query Parameters:**
 - `offset` (int, default=0): Skip N photos
-- `limit` (int, default=100, max=1000): Number of photos to return
+- `limit` (int, default=100, max=5000): Number of photos to return
 
 **Access Control:**
 - **Anonymous (no auth header)**: Only `public` photos returned
