@@ -14,9 +14,6 @@ from src.schemas.photo_collection import (
     PhotoCollectionCreate,
     PhotoCollectionUpdate,
     PhotoCollectionResponse,
-    AddPhotosRequest,
-    RemovePhotosRequest,
-    ReorderPhotosRequest,
     AddItemsRequest,
     ReorderItemsRequest,
     UpdateTextCardRequest,
@@ -101,144 +98,42 @@ class PhotoCollectionService:
         collection = self._get_collection_or_404(collection_id, user_id)
         return self.collection_repo.delete(collection)
     
-    # Photo management operations
-    
-    def add_photos(
-        self, 
-        collection_id: int, 
-        user_id: int, 
-        request: AddPhotosRequest
-    ) -> PhotoManagementResponse:
-        """
-        Add photos to collection.
-        Validates photos exist and belong to user.
-        """
-        collection = self._get_collection_or_404(collection_id, user_id)
-        
-        # Validate photos
-        valid_hothashes = self._validate_user_photos(user_id, request.hothashes)
-        if len(valid_hothashes) < len(request.hothashes):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Some photos not found or don't belong to user"
-            )
-        
-        # Add photos
-        added_count = self.collection_repo.add_photos(collection, list(valid_hothashes))
-        
-        # Refresh to get updated data
-        self.db.refresh(collection)
-        
-        return PhotoManagementResponse(
-            collection_id=collection.id,
-            item_count=collection.item_count,
-            photo_count=collection.photo_count,
-            affected_count=added_count,
-            cover_photo_hothash=collection.cover_photo_hothash
-        )
-    
-    def remove_photos(
-        self, 
-        collection_id: int, 
-        user_id: int, 
-        request: RemovePhotosRequest
-    ) -> PhotoManagementResponse:
-        """Remove photos from collection"""
-        collection = self._get_collection_or_404(collection_id, user_id)
-        
-        # Remove photos
-        removed_count = self.collection_repo.remove_photos(collection, request.hothashes)
-        
-        # Refresh to get updated data
-        self.db.refresh(collection)
-        
-        return PhotoManagementResponse(
-            collection_id=collection.id,
-            item_count=collection.item_count,
-            photo_count=collection.photo_count,
-            affected_count=removed_count,
-            cover_photo_hothash=collection.cover_photo_hothash
-        )
-    
-    def reorder_photos(
-        self, 
-        collection_id: int, 
-        user_id: int, 
-        request: ReorderPhotosRequest
-    ) -> PhotoManagementResponse:
-        """
-        Reorder photos in collection.
-        New list must contain exactly the same hothashes.
-        """
-        collection = self._get_collection_or_404(collection_id, user_id)
-        
-        # Reorder photos
-        success = self.collection_repo.reorder_photos(collection, request.hothashes)
-        
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Provided hothashes don't match collection contents"
-            )
-        
-        # Refresh to get updated data
-        self.db.refresh(collection)
-        
-        return PhotoManagementResponse(
-            collection_id=collection.id,
-            item_count=collection.item_count,
-            photo_count=collection.photo_count,
-            affected_count=len(request.hothashes),
-            cover_photo_hothash=collection.cover_photo_hothash
-        )
-    
-    def get_collection_photos(
-        self, 
-        collection_id: int, 
-        user_id: int
-    ) -> List[Photo]:
-        """
-        Get all Photo objects for collection.
-        Returns photos in collection order (complete list - no pagination).
-        
-        Note: Only returns photos, not text cards. Text cards are only in items array.
-        """
-        collection = self._get_collection_or_404(collection_id, user_id)
-        
-        if not collection.hothashes:
-            return []
-        
-        # Fetch all photos
-        photos = self.photo_repo.get_by_hothashes(collection.hothashes, user_id)
-        
-        # Sort by collection order
-        hothash_to_photo = {p.hothash: p for p in photos}
-        ordered_photos = [
-            hothash_to_photo[h] 
-            for h in collection.hothashes 
-            if h in hothash_to_photo
-        ]
-        
-        return ordered_photos
-    
     def cleanup_collection(self, collection_id: int, user_id: int) -> int:
         """
-        Remove invalid hothashes from collection.
-        Returns number of invalid hothashes removed.
+        Remove invalid photos from collection items.
+        Returns number of invalid photos removed.
         """
         collection = self._get_collection_or_404(collection_id, user_id)
         
-        if not collection.hothashes:
+        if not collection.items:
+            return 0
+        
+        # Extract photo hothashes from items
+        photo_hothashes = [
+            item['photo_hothash']
+            for item in collection.items
+            if item.get('type') == 'photo'
+        ]
+        
+        if not photo_hothashes:
             return 0
         
         # Get valid hothashes
-        valid_hothashes = self._validate_user_photos(user_id, collection.hothashes)
+        valid_hothashes = self._validate_user_photos(user_id, photo_hothashes)
         
-        # Cleanup
-        removed_count = self.collection_repo.cleanup_invalid_hothashes(
-            collection, 
-            valid_hothashes
-        )
+        # Remove invalid photos from items
+        original_count = len(collection.items)
+        collection.items = [
+            item for item in collection.items
+            if item.get('type') != 'photo' or item.get('photo_hothash') in valid_hothashes
+        ]
+        
+        removed_count = original_count - len(collection.items)
+        
+        if removed_count > 0:
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(collection, 'items')
+            self.db.commit()
         
         return removed_count
     

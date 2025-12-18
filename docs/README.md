@@ -47,7 +47,7 @@ Historical planning and implementation documents:
 #### [`archive/implementation/`](./archive/implementation/)
 - `HYBRID_HOTHASH_IMPLEMENTATION_PLAN.md` - ✅ Completed: Hybrid ID implementation
 - `PHOTO_AND_IMAGEFILE_MODEL.md` - Photo vs ImageFile architecture details
-- `PHOTO_COLLECTION_SYSTEM.md` - Collection system details
+- `PHOTO_COLLECTION_SYSTEM.md` - ⚠️ DEPRECATED: Old photo-only collections (replaced by items-based architecture)
 - `PHOTO_SEARCH_IMPLEMENTATION.md` - Search implementation details
 - `PHOTO_SEARCH_RULES.md` - Search rules and filters
 

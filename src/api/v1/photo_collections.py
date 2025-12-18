@@ -1,8 +1,6 @@
 """
 Photo Collections API endpoints
 """
-from typing import List
-
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
@@ -220,32 +218,6 @@ def update_text_card(
     """
     service = PhotoCollectionService(db)
     return service.update_text_card(collection_id, current_user.id, position, request)
-
-
-@router.get(
-    "/{collection_id}/photos",
-    response_model=List[str],
-    summary="Get photo hothashes in collection"
-)
-def get_collection_photos(
-    collection_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Get list of photo hothashes in collection order.
-    
-    Returns simple array of hothashes (photos only, no text cards).
-    For full items with metadata, use GET /{collection_id} and parse the items array.
-    """
-    service = PhotoCollectionService(db)
-    collection = service.get_collection(collection_id, current_user.id)
-    # Return only photo hothashes from items array
-    return [
-        item['photo_hothash'] 
-        for item in collection.items 
-        if item.get('type') == 'photo'
-    ]
 
 
 @router.post(

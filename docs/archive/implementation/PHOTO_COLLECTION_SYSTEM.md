@@ -1,5 +1,11 @@
 # PhotoCollection System Documentation
 
+> **⚠️ DEPRECATED DOCUMENTATION**  
+> This document describes the original photo-only Collections architecture.  
+> **Current Version:** Collections now support mixed content (photos + text cards) via `items` array.  
+> **See:** `docs/API_REFERENCE.md` section "Photo Collections (Curated Photo Sets with Text Cards)"  
+> **Date Archived:** December 18, 2025
+
 ## Overview
 
 PhotoCollection is a static photo organization system that allows users to create named collections of photos identified by their hothashes. Unlike SavedPhotoSearch (dynamic, criteria-based), PhotoCollection maintains explicit lists of specific photos.

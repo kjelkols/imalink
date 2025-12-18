@@ -20,16 +20,18 @@ class PhotoCollectionRepository:
     
     def create(self, user_id: int, collection_data: PhotoCollectionCreate) -> PhotoCollection:
         """Create new photo collection"""
+        # Convert initial hothashes to items
+        items = [
+            {"type": "photo", "photo_hothash": h}
+            for h in collection_data.hothashes
+        ] if collection_data.hothashes else []
+        
         collection = PhotoCollection(
             user_id=user_id,
             name=collection_data.name,
             description=collection_data.description,
-            items=[]  # Initialize empty items array
+            items=items
         )
-        
-        # If hothashes provided, add them as photo items
-        if collection_data.hothashes:
-            collection.add_photos(collection_data.hothashes)
         
         self.db.add(collection)
         self.db.commit()
@@ -80,62 +82,27 @@ class PhotoCollectionRepository:
         self.db.commit()
         return True
     
-    # Photo management operations
-    
-    def add_photos(self, collection: PhotoCollection, hothashes: List[str]) -> int:
-        """
-        Add photos to collection.
-        Returns number of photos actually added (excludes duplicates).
-        """
-        added_count = collection.add_photos(hothashes)
-        if added_count > 0:
-            self.db.commit()
-            self.db.refresh(collection)
-        return added_count
-    
-    def remove_photos(self, collection: PhotoCollection, hothashes: List[str]) -> int:
-        """
-        Remove photos from collection.
-        Returns number of photos actually removed.
-        """
-        removed_count = collection.remove_photos(hothashes)
-        if removed_count > 0:
-            self.db.commit()
-            self.db.refresh(collection)
-        return removed_count
-    
-    def reorder_photos(self, collection: PhotoCollection, hothashes: List[str]) -> bool:
-        """
-        Reorder photos in collection.
-        Returns True if successful, False if hothashes don't match existing.
-        """
-        success = collection.reorder_photos(hothashes)
-        if success:
-            self.db.commit()
-            self.db.refresh(collection)
-        return success
-    
-    def cleanup_invalid_hothashes(self, collection: PhotoCollection, valid_hothashes: set) -> int:
-        """
-        Remove invalid hothashes from collection.
-        Returns number of invalid hothashes removed.
-        """
-        removed_count = collection.cleanup_invalid_hothashes(valid_hothashes)
-        if removed_count > 0:
-            self.db.commit()
-            self.db.refresh(collection)
-        return removed_count
-    
     # Utility queries
     
     def find_collections_containing_photo(self, user_id: int, hothash: str) -> List[PhotoCollection]:
         """Find all user's collections containing specific photo"""
+        # Query items JSONB array for photos with matching hothash
+        # PostgreSQL: items @> '[{"type": "photo", "photo_hothash": "..."}]'
+        # But simpler: just get all collections and filter in Python (items is already loaded)
         stmt = select(PhotoCollection).where(
-            PhotoCollection.user_id == user_id,
-            PhotoCollection.hothashes.contains([hothash])
+            PhotoCollection.user_id == user_id
         )
         result = self.db.execute(stmt)
-        return list(result.scalars().all())
+        all_collections = list(result.scalars().all())
+        
+        # Filter in Python
+        return [
+            c for c in all_collections
+            if any(
+                item.get('type') == 'photo' and item.get('photo_hothash') == hothash
+                for item in c.items
+            )
+        ]
     
     def get_collection_by_name(self, user_id: int, name: str) -> Optional[PhotoCollection]:
         """Find collection by exact name (case-sensitive)"""

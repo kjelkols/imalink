@@ -2922,35 +2922,16 @@ Authorization: Bearer {token}
 
 **Note:** Position is implicit from array index (first item = position 0).
 
-### Get Photos in Collection (Photos Only)
+**Extracting Photos from Items (Frontend Pattern):**
+```javascript
+// Get collection
+const collection = await api.getCollection(id);
 
-```http
-GET /api/v1/collections/{id}/photos
-Authorization: Bearer {token}
+// Extract only photo hothashes
+const photoHothashes = collection.items
+  .filter(item => item.type === 'photo')
+  .map(item => item.photo_hothash);
 ```
-
-**Response (Simple Array):**
-```json
-[
-  {
-    "hothash": "abc123...",
-    "width": 4000,
-    "height": 3000,
-    "rating": 4,
-    "taken_at": "2024-06-15T14:30:00Z",
-    ...
-  },
-  {
-    "hothash": "def456...",
-    ...
-  }
-]
-```
-
-**Notes:**
-- Returns ALL photos in collection order (no pagination - you always need the complete list)
-- Filters out text cards - only returns Photo objects
-- For mixed content (photos + text cards), use `GET /collections/{id}` and parse the `items` array
 
 ### Create Collection
 

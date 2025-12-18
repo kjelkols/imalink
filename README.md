@@ -15,6 +15,7 @@ Et enkelt og intuitivt verktøy for organisering av store bildematerialer.
 - **🔐 Multi-User Authentication**: JWT-basert autentisering med brukerregistrering og innlogging
 - **🔒 User Data Isolation**: Komplett dataseparasjon - brukere ser kun egne bilder
 - **📅 Events (Hierarchical Organization)**: Organiser bilder hierarkisk (f.eks. "London 2025" > "Tower of London")
+- **📚 Collections (Mixed Content)**: Kuraterte album med bilder + tekstkort for porteføljer og leveranser
 - **🖼️ Crystal Clear Upload API**: Separate endepunkter for nye bilder vs companion-filer
 - **Desktop Client**: Python/Flet desktop application med direkte database-tilgang
 - **Import System**: Frontend-styrt import med API-baserte operasjoner

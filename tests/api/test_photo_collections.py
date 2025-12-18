@@ -261,8 +261,7 @@ class TestPhotoCollectionsAPI:
                 {"type": "photo", "photo_hothash": "abc"},
                 {"type": "text", "text_card": {"title": "Text", "body": "Body"}},
                 {"type": "photo", "photo_hothash": "def"}
-            ],
-            hothashes=["abc", "def"]  # Sync legacy field
+            ]
         )
         test_db_session.add(collection)
         test_db_session.commit()
@@ -400,14 +399,14 @@ class TestPhotoCollectionsAPI:
         )
         assert response.status_code == 422
     
-    def test_get_collection_photos_filters_text_cards(
+    def test_get_collection_extracts_photos_from_items(
         self,
         client: TestClient,
         test_user: User,
         auth_headers: dict,
         test_db_session: Session
     ):
-        """Test that GET /collections/{id}/photos returns only photos, not text cards"""
+        """Test that photos can be extracted from items array"""
         photo1 = Photo(user_id=test_user.id, hothash="abc", width=100, height=100, hotpreview=b"1")
         photo2 = Photo(user_id=test_user.id, hothash="def", width=100, height=100, hotpreview=b"2")
         test_db_session.add_all([photo1, photo2])
@@ -419,24 +418,29 @@ class TestPhotoCollectionsAPI:
                 {"type": "photo", "photo_hothash": "abc"},
                 {"type": "text", "text_card": {"title": "Text", "body": "Body"}},
                 {"type": "photo", "photo_hothash": "def"}
-            ],
-            hothashes=["abc", "def"]  # Sync legacy field
+            ]
         )
         test_db_session.add(collection)
         test_db_session.commit()
         
-        # Get photos only (just hothashes)
+        # Get collection and extract photos from items
         response = client.get(
-            f"/api/v1/collections/{collection.id}/photos",
+            f"/api/v1/collections/{collection.id}",
             headers=auth_headers
         )
         
         assert response.status_code == 200
         data = response.json()
-        # Response is simple array of hothashes
-        assert isinstance(data, list)
-        assert len(data) == 2  # Only 2 photos, text card excluded
-        assert data == ["abc", "def"]  # Just hothashes, in order
+        assert data["photo_count"] == 2
+        assert data["text_card_count"] == 1
+        
+        # Extract photos from items (what frontend should do)
+        photo_hothashes = [
+            item["photo_hothash"]
+            for item in data["items"]
+            if item.get("type") == "photo"
+        ]
+        assert photo_hothashes == ["abc", "def"]
     
     def test_user_isolation(
         self,
@@ -452,7 +456,7 @@ class TestPhotoCollectionsAPI:
         test_db_session.commit()  # Commit to get other_user.id
         
         # Create collection for other user
-        collection = PhotoCollection(user_id=other_user.id, name="Other's Collection", items=[], hothashes=[])
+        collection = PhotoCollection(user_id=other_user.id, name="Other's Collection", items=[])
         test_db_session.add(collection)
         test_db_session.commit()
         

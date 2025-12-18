@@ -82,52 +82,7 @@ class PhotoCollectionResponse(PhotoCollectionBase):
     model_config = {"from_attributes": True}
 
 
-# Photo management schemas
-class AddPhotosRequest(BaseModel):
-    """Request to add photos to collection"""
-    hothashes: List[str] = Field(..., min_length=1, description="Photos to add")
-    
-    @field_validator('hothashes')
-    @classmethod
-    def validate_hothashes(cls, v: List[str]) -> List[str]:
-        if not v:
-            raise ValueError('Must provide at least one hothash')
-        # Remove duplicates while preserving order
-        seen = set()
-        unique = []
-        for h in v:
-            if h not in seen:
-                seen.add(h)
-                unique.append(h)
-        return unique
-
-
-class RemovePhotosRequest(BaseModel):
-    """Request to remove photos from collection"""
-    hothashes: List[str] = Field(..., min_length=1, description="Photos to remove")
-    
-    @field_validator('hothashes')
-    @classmethod
-    def validate_hothashes(cls, v: List[str]) -> List[str]:
-        if not v:
-            raise ValueError('Must provide at least one hothash')
-        return list(set(v))  # Remove duplicates
-
-
-class ReorderPhotosRequest(BaseModel):
-    """Request to reorder photos in collection"""
-    hothashes: List[str] = Field(..., min_length=1, description="All photos in new order")
-    
-    @field_validator('hothashes')
-    @classmethod
-    def validate_hothashes(cls, v: List[str]) -> List[str]:
-        if not v:
-            raise ValueError('Must provide at least one hothash')
-        if len(v) != len(set(v)):
-            raise ValueError('Duplicate hothashes not allowed in reorder')
-        return v
-
-
+# Item management schemas
 class AddItemsRequest(BaseModel):
     """Request to add items to collection"""
     items: List[Dict[str, Any]] = Field(..., min_length=1, description="Items to add")

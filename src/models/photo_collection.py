@@ -48,10 +48,6 @@ class PhotoCollection(Base, TimestampMixin):
     # Position is implicit from array index
     items = Column(JSON, nullable=False, default=list)
     
-    # Legacy: Photo list - JSON array of hothashes (kept for backward compatibility)
-    # Will be auto-synced from items array
-    hothashes = Column(JSON, nullable=False, default=list)
-    
     # Timestamps via TimestampMixin (created_at, updated_at)
     
     # Relationships
@@ -86,16 +82,16 @@ class PhotoCollection(Base, TimestampMixin):
                 return item.get('photo_hothash')
         return None
     
-    def _sync_hothashes(self):
-        """Sync legacy hothashes field from items array"""
+    @property
+    def hothashes(self) -> List[str]:
+        """List of photo hothashes (computed from items array)"""
         if not self.items:
-            self.hothashes = []
-        else:
-            self.hothashes = [
-                item['photo_hothash'] 
-                for item in self.items 
-                if item.get('type') == 'photo' and item.get('photo_hothash')
-            ]
+            return []
+        return [
+            item['photo_hothash'] 
+            for item in self.items 
+            if item.get('type') == 'photo' and item.get('photo_hothash')
+        ]
     
     def add_items(self, new_items: List[dict]) -> int:
         """
@@ -132,16 +128,7 @@ class PhotoCollection(Base, TimestampMixin):
         
         # Flag the column as modified for SQLAlchemy
         flag_modified(self, 'items')
-        self._sync_hothashes()
         return added
-    
-    def add_photos(self, hothashes: List[str]) -> int:
-        """
-        Add photos to collection (backward compatibility).
-        Returns number of photos added (skips duplicates).
-        """
-        items = [{"type": "photo", "photo_hothash": h} for h in hothashes]
-        return self.add_items(items)
     
     def remove_item_at_position(self, position: int) -> bool:
         """
@@ -153,28 +140,7 @@ class PhotoCollection(Base, TimestampMixin):
         
         del self.items[position]
         flag_modified(self, 'items')
-        self._sync_hothashes()
         return True
-    
-    def remove_photos(self, hothashes: List[str]) -> int:
-        """
-        Remove photos from collection (backward compatibility).
-        Returns number of photos removed.
-        """
-        if not self.items:
-            return 0
-        
-        to_remove = set(hothashes)
-        original_count = len(self.items)
-        
-        self.items = [
-            item for item in self.items
-            if not (item.get('type') == 'photo' and item.get('photo_hothash') in to_remove)
-        ]
-        
-        flag_modified(self, 'items')
-        self._sync_hothashes()
-        return original_count - len(self.items)
     
     def reorder_items(self, items: List[dict]) -> bool:
         """
@@ -185,7 +151,6 @@ class PhotoCollection(Base, TimestampMixin):
         # Strip position fields if present
         self.items = [{k: v for k, v in item.items() if k != 'position'} for item in items]
         flag_modified(self, 'items')
-        self._sync_hothashes()
         return True
     
     def update_text_card(self, position: int, title: Optional[str] = None, body: Optional[str] = None) -> bool:
@@ -205,48 +170,9 @@ class PhotoCollection(Base, TimestampMixin):
         if body is not None:
             item['text_card']['body'] = body
         
-        # Flag the column as modified for SQLAlchemy to detect changes
+        # Flag the column as modified for SQLAlchemy
         flag_modified(self, 'items')
-        
         return True
-    
-    def reorder_photos(self, hothashes: List[str]) -> bool:
-        """
-        Reorder photos in collection (backward compatibility).
-        New list must contain exactly the same hothashes (just reordered).
-        Removes all text cards (photo-only operation).
-        Returns True if successful, False if hothashes don't match.
-        """
-        if not self.items:
-            return False
-        
-        current_hothashes = set(self.hothashes)
-        if set(hothashes) != current_hothashes:
-            return False
-        
-        # Rebuild items array with new photo order (photos only)
-        hothash_to_item = {
-            item['photo_hothash']: {k: v for k, v in item.items() if k != 'position'}
-            for item in self.items 
-            if item.get('type') == 'photo'
-        }
-        
-        self.items = [hothash_to_item[h] for h in hothashes]
-        self._sync_hothashes()
-        return True
-    
-    def cleanup_invalid_hothashes(self, valid_hothashes: set) -> int:
-        """
-        Remove hothashes that no longer exist in database.
-        Returns number of invalid hothashes removed.
-        """
-        if not self.hothashes:
-            return 0
-        
-        original_count = len(self.hothashes)
-        self.hothashes = [h for h in self.hothashes if h in valid_hothashes]
-        
-        return original_count - len(self.hothashes)
     
     def __repr__(self):
         return f"<PhotoCollection(id={self.id}, name='{self.name}', photos={self.photo_count})>"
