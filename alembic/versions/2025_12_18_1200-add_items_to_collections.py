@@ -32,18 +32,20 @@ def upgrade() -> None:
     
     # For PostgreSQL
     if connection.dialect.name == 'postgresql':
+        # Cast JSON to JSONB for processing, then convert back to JSON
         connection.execute(sa.text("""
             UPDATE photo_collections
             SET items = (
-                SELECT jsonb_agg(
-                    jsonb_build_object(
+                SELECT json_agg(
+                    json_build_object(
                         'type', 'photo',
                         'photo_hothash', hothash
                     )
                 )
-                FROM unnest(hothashes) AS hothash
-            )
-            WHERE hothashes IS NOT NULL AND jsonb_array_length(hothashes) > 0
+                FROM json_array_elements_text(hothashes::json) AS hothash
+            )::text::json
+            WHERE hothashes IS NOT NULL 
+            AND json_array_length(hothashes::json) > 0
         """))
     else:
         # For SQLite - fetch and update row by row
