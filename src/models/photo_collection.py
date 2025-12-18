@@ -40,10 +40,11 @@ class PhotoCollection(Base, TimestampMixin):
     
     # Items - Mixed content (photos + text cards) in display order
     # Example: [
-    #   {"type": "photo", "position": 0, "photo_hothash": "abc123..."},
-    #   {"type": "text", "position": 1, "text_card": {"title": "Summer", "body": "..."}},
-    #   {"type": "photo", "position": 2, "photo_hothash": "def456..."}
+    #   {"type": "photo", "photo_hothash": "abc123..."},
+    #   {"type": "text", "text_card": {"title": "Summer", "body": "..."}},
+    #   {"type": "photo", "photo_hothash": "def456..."}
     # ]
+    # Position is implicit from array index
     items = Column(JSON, nullable=False, default=list)
     
     # Legacy: Photo list - JSON array of hothashes (kept for backward compatibility)
@@ -114,7 +115,6 @@ class PhotoCollection(Base, TimestampMixin):
         }
         
         added = 0
-        next_position = len(self.items)
         
         for item in new_items:
             # Skip duplicate photos
@@ -124,10 +124,9 @@ class PhotoCollection(Base, TimestampMixin):
                     continue
                 existing_hothashes.add(hothash)
             
-            # Add position
-            item['position'] = next_position
-            self.items.append(item)
-            next_position += 1
+            # Strip position field if present (not needed - array index is position)
+            item_copy = {k: v for k, v in item.items() if k != 'position'}
+            self.items.append(item_copy)
             added += 1
         
         self._sync_hothashes()
@@ -143,19 +142,13 @@ class PhotoCollection(Base, TimestampMixin):
     
     def remove_item_at_position(self, position: int) -> bool:
         """
-        Remove item at specific position.
-        Recalculates positions for remaining items.
+        Remove item at specific position (array index).
         Returns True if removed, False if position invalid.
         """
         if not self.items or position < 0 or position >= len(self.items):
             return False
         
         del self.items[position]
-        
-        # Recalculate positions
-        for i, item in enumerate(self.items):
-            item['position'] = i
-        
         self._sync_hothashes()
         return True
     
@@ -175,24 +168,17 @@ class PhotoCollection(Base, TimestampMixin):
             if not (item.get('type') == 'photo' and item.get('photo_hothash') in to_remove)
         ]
         
-        # Recalculate positions
-        for i, item in enumerate(self.items):
-            item['position'] = i
-        
         self._sync_hothashes()
         return original_count - len(self.items)
     
     def reorder_items(self, items: List[dict]) -> bool:
         """
         Reorder all items in collection.
-        Replaces entire items array and recalculates positions.
+        Replaces entire items array (position is implicit from array index).
         Returns True if successful.
         """
-        # Assign positions
-        for i, item in enumerate(items):
-            item['position'] = i
-        
-        self.items = items
+        # Strip position fields if present
+        self.items = [{k: v for k, v in item.items() if k != 'position'} for item in items]
         self._sync_hothashes()
         return True
     
@@ -219,6 +205,7 @@ class PhotoCollection(Base, TimestampMixin):
         """
         Reorder photos in collection (backward compatibility).
         New list must contain exactly the same hothashes (just reordered).
+        Removes all text cards (photo-only operation).
         Returns True if successful, False if hothashes don't match.
         """
         if not self.items:
@@ -228,22 +215,14 @@ class PhotoCollection(Base, TimestampMixin):
         if set(hothashes) != current_hothashes:
             return False
         
-        # Rebuild items array with new photo order, preserving text cards
-        new_items = []
-        position = 0
+        # Rebuild items array with new photo order (photos only)
         hothash_to_item = {
-            item['photo_hothash']: item 
+            item['photo_hothash']: {k: v for k, v in item.items() if k != 'position'}
             for item in self.items 
             if item.get('type') == 'photo'
         }
         
-        for hothash in hothashes:
-            item = hothash_to_item[hothash].copy()
-            item['position'] = position
-            new_items.append(item)
-            position += 1
-        
-        self.items = new_items
+        self.items = [hothash_to_item[h] for h in hothashes]
         self._sync_hothashes()
         return True
     

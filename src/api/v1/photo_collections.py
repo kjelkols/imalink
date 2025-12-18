@@ -222,6 +222,8 @@ def add_items_to_collection(
     - Photo: `{"type": "photo", "photo_hothash": "abc123..."}`
     - Text card: `{"type": "text", "text_card": {"title": "...", "body": "..."}}`
     
+    **Note:** Position is implicit from array index (no position field needed).
+    
     **Validation:**
     - Text card title: max 200 characters
     - Text card body: max 2000 characters (plain text)
@@ -265,9 +267,9 @@ def delete_collection_item(
     db: Session = Depends(get_db)
 ):
     """
-    Delete item (photo or text card) at specific position.
+    Delete item (photo or text card) at specific position (array index, 0-based).
     
-    Positions are recalculated automatically for remaining items.
+    Remaining items shift down automatically (no gaps in array).
     """
     service = PhotoCollectionService(db)
     return service.delete_item_at_position(collection_id, current_user.id, position)

@@ -38,11 +38,10 @@ def upgrade() -> None:
                 SELECT jsonb_agg(
                     jsonb_build_object(
                         'type', 'photo',
-                        'position', position - 1,
                         'photo_hothash', hothash
                     )
                 )
-                FROM unnest(hothashes) WITH ORDINALITY AS t(hothash, position)
+                FROM unnest(hothashes) AS hothash
             )
             WHERE hothashes IS NOT NULL AND jsonb_array_length(hothashes) > 0
         """))
@@ -59,10 +58,9 @@ def upgrade() -> None:
                 items = [
                     {
                         "type": "photo",
-                        "position": i,
                         "photo_hothash": hothash
                     }
-                    for i, hothash in enumerate(hothashes)
+                    for hothash in hothashes
                 ]
                 
                 connection.execute(

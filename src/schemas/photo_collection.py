@@ -20,16 +20,14 @@ class TextCardContent(BaseModel):
 
 
 class CollectionItemPhoto(BaseModel):
-    """Photo item in collection"""
+    """Photo item in collection (position is implicit from array index)"""
     type: Literal['photo'] = 'photo'
-    position: int = Field(..., ge=0)
     photo_hothash: str = Field(..., min_length=1)
 
 
 class CollectionItemText(BaseModel):
-    """Text card item in collection"""
+    """Text card item in collection (position is implicit from array index)"""
     type: Literal['text'] = 'text'
-    position: int = Field(..., ge=0)
     text_card: TextCardContent
 
 
