@@ -2849,16 +2849,17 @@ curl -X PUT http://localhost:8000/api/v1/photos/abc123.../event \
 
 ---
 
-## 📚 Photo Collections (Curated Photo Sets)
+## 📚 Photo Collections (Curated Photo Sets with Text Cards)
 
-Collections are flat, ordered lists of photos for curated albums, portfolios, or client deliverables. Unlike Events (hierarchical), Collections are simple many-to-many relationships.
+Collections are ordered lists of mixed content (photos + text cards) for curated albums, portfolios, or client deliverables. Unlike Events (hierarchical), Collections are simple flat structures with explicit ordering.
 
 **Key Features:**
-- **Flat structure**: No hierarchy, just ordered lists
+- **Mixed content**: Combine photos and text cards in same collection
+- **Text cards**: Add captions, notes, descriptions between photos
+- **Explicit ordering**: Items array defines exact order (position = array index)
 - **Many-to-many**: Photos can be in multiple collections
-- **Ordered**: Manual sorting via `hothashes` array
 - **User-scoped**: Each user has their own collections
-- **Flexible**: Add/remove photos without affecting originals
+- **Flexible**: Add/remove items without affecting originals
 
 ### List Collections
 
@@ -2877,9 +2878,12 @@ Authorization: Bearer {token}
   "collections": [
     {
       "id": 1,
-      "title": "Best of 2024",
+      "name": "Best of 2024",
       "description": "My favorite photos from 2024",
+      "item_count": 52,
       "photo_count": 45,
+      "text_card_count": 7,
+      "cover_photo_hothash": "abc123...",
       "created_at": "2024-01-15T10:30:00Z",
       "updated_at": "2024-12-16T14:22:00Z"
     }
@@ -2899,49 +2903,54 @@ Authorization: Bearer {token}
 ```json
 {
   "id": 1,
-  "title": "Best of 2024",
+  "name": "Best of 2024",
   "description": "My favorite photos from 2024",
-  "hothashes": ["abc123...", "def456...", "ghi789..."],
+  "items": [
+    {"type": "photo", "photo_hothash": "abc123..."},
+    {"type": "text", "text_card": {"title": "Summer Memories", "body": "These photos are from..."}},
+    {"type": "photo", "photo_hothash": "def456..."},
+    {"type": "photo", "photo_hothash": "ghi789..."}
+  ],
+  "item_count": 52,
   "photo_count": 45,
+  "text_card_count": 7,
+  "cover_photo_hothash": "abc123...",
   "created_at": "2024-01-15T10:30:00Z",
   "updated_at": "2024-12-16T14:22:00Z"
 }
 ```
 
-### Get Photos in Collection
+**Note:** Position is implicit from array index (first item = position 0).
+
+### Get Photos in Collection (Photos Only)
 
 ```http
-GET /api/v1/collections/{id}/photos?skip=0&limit=100
+GET /api/v1/collections/{id}/photos
 Authorization: Bearer {token}
 ```
 
-**Query Parameters:**
-- `skip` (int, default=0): Number of photos to skip
-- `limit` (int, default=100, max=5000): Number of photos to return
-
-**Response (PaginatedResponse):**
+**Response (Simple Array):**
 ```json
-{
-  "data": [
-    {
-      "hothash": "abc123...",
-      "width": 4000,
-      "height": 3000,
-      "rating": 4,
-      "taken_at": "2024-06-15T14:30:00Z",
-      ...
-    }
-  ],
-  "total": 45,
-  "offset": 0,
-  "limit": 100
-}
+[
+  {
+    "hothash": "abc123...",
+    "width": 4000,
+    "height": 3000,
+    "rating": 4,
+    "taken_at": "2024-06-15T14:30:00Z",
+    ...
+  },
+  {
+    "hothash": "def456...",
+    ...
+  }
+]
 ```
 
 **Notes:**
-- Photos returned in collection order (as defined by `hothashes` array)
-- `total` is the total number of photos in the collection
-- Use pagination for large collections (thousands of photos)
+- Returns ALL photos in collection order (no pagination - you always need the complete list)
+- Filters out text cards - only returns Photo objects
+- For mixed content (photos + text cards), use `GET /collections/{id}` and parse the `items` array
 
 ### Create Collection
 
@@ -2951,8 +2960,9 @@ Authorization: Bearer {token}
 Content-Type: application/json
 
 {
-  "title": "Summer Vacation 2024",
-  "description": "Photos from our trip to Italy"
+  "name": "Summer Vacation 2024",
+  "description": "Photos from our trip to Italy",
+  "hothashes": ["abc123...", "def456..."]  // Optional: initial photos
 }
 ```
 
@@ -2960,27 +2970,35 @@ Content-Type: application/json
 ```json
 {
   "id": 5,
-  "title": "Summer Vacation 2024",
+  "name": "Summer Vacation 2024",
   "description": "Photos from our trip to Italy",
-  "hothashes": [],
-  "photo_count": 0,
+  "items": [
+    {"type": "photo", "photo_hothash": "abc123..."},
+    {"type": "photo", "photo_hothash": "def456..."}
+  ],
+  "item_count": 2,
+  "photo_count": 2,
+  "text_card_count": 0,
+  "cover_photo_hothash": "abc123...",
   "created_at": "2024-12-16T15:00:00Z",
   "updated_at": "2024-12-16T15:00:00Z"
 }
 ```
 
-### Update Collection
+### Update Collection Metadata
 
 ```http
-PUT /api/v1/collections/{id}
+PATCH /api/v1/collections/{id}
 Authorization: Bearer {token}
 Content-Type: application/json
 
 {
-  "title": "Italian Adventure 2024",
+  "name": "Italian Adventure 2024",
   "description": "Updated description"
 }
 ```
+
+**Note:** This only updates metadata (name, description). To modify items, use the item management endpoints below.
 
 ### Delete Collection
 
@@ -2993,70 +3011,154 @@ Authorization: Bearer {token}
 - Deletes only the collection, not the photos
 - Returns 204 No Content on success
 
-### Add Photos to Collection
+---
+
+## Item Management (Photos + Text Cards)
+
+### Add Items to Collection
 
 ```http
-POST /api/v1/collections/{id}/photos
+POST /api/v1/collections/{id}/items
 Authorization: Bearer {token}
 Content-Type: application/json
 
 {
-  "hothashes": ["abc123...", "def456...", "ghi789..."]
+  "items": [
+    {"type": "photo", "photo_hothash": "abc123..."},
+    {"type": "text", "text_card": {"title": "Summer Memories", "body": "These photos capture..."}},
+    {"type": "photo", "photo_hothash": "def456..."}
+  ]
 }
 ```
 
 **Response:**
 ```json
 {
-  "added": 3,
-  "skipped": 0,
-  "message": "Added 3 photos to collection"
+  "collection_id": 1,
+  "item_count": 52,
+  "photo_count": 45,
+  "affected_count": 3
 }
 ```
 
-**Notes:**
-- Duplicates are automatically skipped
-- Photos appended to end of collection
+**Item Types:**
+- **Photo**: `{"type": "photo", "photo_hothash": "abc123..."}`
+- **Text Card**: `{"type": "text", "text_card": {"title": "...", "body": "..."}}`
 
-### Remove Photos from Collection
+**Validation:**
+- Text card title: max 200 characters
+- Text card body: max 2000 characters (plain text)
+- Photos must exist and belong to user
+- Duplicate photos are automatically skipped
+
+**Notes:**
+- Items are appended to end of collection
+- Position is implicit from array index (no position field needed)
+
+### Reorder Items (Drag-and-Drop)
 
 ```http
-DELETE /api/v1/collections/{id}/photos
+PUT /api/v1/collections/{id}/items/reorder
 Authorization: Bearer {token}
 Content-Type: application/json
 
 {
-  "hothashes": ["abc123...", "def456..."]
+  "items": [
+    {"type": "text", "text_card": {"title": "Introduction", "body": "..."}},
+    {"type": "photo", "photo_hothash": "ghi789..."},
+    {"type": "photo", "photo_hothash": "abc123..."},
+    {"type": "photo", "photo_hothash": "def456..."}
+  ]
 }
 ```
 
 **Response:**
 ```json
 {
-  "removed": 2,
-  "message": "Removed 2 photos from collection"
+  "collection_id": 1,
+  "item_count": 4,
+  "photo_count": 3,
+  "affected_count": 4
 }
 ```
 
-### Reorder Collection Photos
+**Important:**
+- **Must include ALL items** you want to keep
+- Items not in list are removed from collection
+- Perfect for drag-and-drop: just send the entire array in new order
+
+### Delete Item at Position
 
 ```http
-PUT /api/v1/collections/{id}/photos/reorder
+DELETE /api/v1/collections/{id}/items/{position}
 Authorization: Bearer {token}
-Content-Type: application/json
+```
 
+**Example:** `DELETE /api/v1/collections/1/items/2` deletes item at index 2 (third item)
+
+**Response:**
+```json
 {
-  "hothashes": ["ghi789...", "abc123...", "def456..."]
+  "collection_id": 1,
+  "item_count": 51,
+  "photo_count": 45,
+  "affected_count": 1
 }
 ```
 
 **Notes:**
-- Replaces entire order - must include ALL hothashes you want to keep
-- Photos not in list are removed from collection
-- Use for drag-and-drop reordering in UI
+- Position is 0-based index (first item = position 0)
+- Remaining items shift down automatically
+
+### Update Text Card
+
+```http
+PATCH /api/v1/collections/{id}/items/{position}
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "title": "Updated Title",
+  "body": "Updated body text..."
+}
+```
+
+**Response:**
+```json
+{
+  "collection_id": 1,
+  "item_count": 52,
+  "photo_count": 45,
+  "affected_count": 1
+}
+```
+
+**Notes:**
+- Only works for text cards (returns 400 if position is a photo)
+- Both fields are optional - send only what you want to update
+- Title max 200 chars, body max 2000 chars
+
+### Cleanup Invalid Photos
+
+```http
+POST /api/v1/collections/{id}/cleanup
+Authorization: Bearer {token}
+```
+
+**Response:**
+```json
+{
+  "collection_id": 1,
+  "removed_count": 3
+}
+```
+
+**Notes:**
+- Removes photos that no longer exist in database
+- Useful for maintaining collection integrity after photo deletions
 
 ---
 
-**Last Updated:** December 16, 2025  
-**API Version:** 3.1 (Events + Collections + PhotoCreateSchema Architecture)  
-**Backend Version:** Fase 1 (Multi-User + Events + PhotoStacks + Photo-Centric API)
+**Last Updated:** December 18, 2025  
+**API Version:** 3.2 (Collections with Text Cards + Items Array)  
+**Backend Version:** Fase 1 (Multi-User + Events + PhotoStacks + Collections with Mixed Content)

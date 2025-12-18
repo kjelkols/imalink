@@ -13,9 +13,6 @@ from src.schemas.photo_collection import (
     PhotoCollectionCreate,
     PhotoCollectionUpdate,
     PhotoCollectionResponse,
-    AddPhotosRequest,
-    RemovePhotosRequest,
-    ReorderPhotosRequest,
     AddItemsRequest,
     ReorderItemsRequest,
     UpdateTextCardRequest,
@@ -23,7 +20,6 @@ from src.schemas.photo_collection import (
     CollectionListResponse
 )
 from src.schemas.photo_schemas import PhotoResponse
-from src.schemas.common import PaginatedResponse
 from src.services.photo_collection_service import PhotoCollectionService
 
 
@@ -130,77 +126,7 @@ def delete_collection(
     service.delete_collection(collection_id, current_user.id)
 
 
-# Photo management endpoints
-
-@router.post(
-    "/{collection_id}/photos",
-    response_model=PhotoManagementResponse,
-    summary="Add photos to collection"
-)
-def add_photos_to_collection(
-    collection_id: int,
-    request: AddPhotosRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Add photos to collection (appends to end).
-    
-    - **hothashes**: List of photo hothashes to add
-    
-    Duplicates are automatically skipped.
-    Photos must exist and belong to user.
-    """
-    service = PhotoCollectionService(db)
-    return service.add_photos(collection_id, current_user.id, request)
-
-
-@router.delete(
-    "/{collection_id}/photos",
-    response_model=PhotoManagementResponse,
-    summary="Remove photos from collection"
-)
-def remove_photos_from_collection(
-    collection_id: int,
-    request: RemovePhotosRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Remove photos from collection.
-    
-    - **hothashes**: List of photo hothashes to remove
-    """
-    service = PhotoCollectionService(db)
-    return service.remove_photos(collection_id, current_user.id, request)
-
-
-@router.put(
-    "/{collection_id}/photos/reorder",
-    response_model=PhotoManagementResponse,
-    summary="Reorder photos in collection (backward compatibility)"
-)
-def reorder_collection_photos(
-    collection_id: int,
-    request: ReorderPhotosRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Reorder photos in collection (legacy endpoint - photos only).
-    
-    **Deprecated**: Use PUT /collections/{id}/items/reorder for mixed content support.
-    
-    - **hothashes**: Complete list of hothashes in new order
-    
-    Must contain exactly the same hothashes as current collection,
-    just in different order. First photo becomes cover photo.
-    """
-    service = PhotoCollectionService(db)
-    return service.reorder_photos(collection_id, current_user.id, request)
-
-
-# NEW: Item management endpoints (photos + text cards)
+# Item management endpoints (photos + text cards)
 
 @router.post(
     "/{collection_id}/items",
@@ -299,42 +225,23 @@ def update_text_card(
 
 @router.get(
     "/{collection_id}/photos",
-    response_model=PaginatedResponse[PhotoResponse],
+    response_model=List[PhotoResponse],
     summary="Get photos in collection"
 )
 def get_collection_photos(
     collection_id: int,
-    skip: int = 0,
-    limit: int = 100,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Get actual Photo objects in collection.
+    Get all Photo objects in collection.
     
-    - **skip**: Number of photos to skip
-    - **limit**: Maximum photos to return
-    
-    Returns photos in collection order with total count.
+    Returns all photos in collection order (no pagination - you always need the complete list).
+    Note: This only returns photos, not text cards. Use GET /{collection_id} for full items array.
     """
     service = PhotoCollectionService(db)
-    photos = service.get_collection_photos(
-        collection_id, 
-        current_user.id, 
-        skip, 
-        limit
-    )
-    
-    # Get total count from collection
-    collection = service.get_collection(collection_id, current_user.id)
-    total = len(collection.hothashes) if collection.hothashes else 0
-    
-    return PaginatedResponse(
-        data=[PhotoResponse.model_validate(p) for p in photos],
-        total=total,
-        offset=skip,
-        limit=limit
-    )
+    photos = service.get_collection_photos(collection_id, current_user.id)
+    return [PhotoResponse.model_validate(p) for p in photos]
 
 
 @router.post(

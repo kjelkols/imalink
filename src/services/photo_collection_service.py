@@ -195,30 +195,27 @@ class PhotoCollectionService:
     def get_collection_photos(
         self, 
         collection_id: int, 
-        user_id: int, 
-        skip: int = 0, 
-        limit: int = 100
+        user_id: int
     ) -> List[Photo]:
         """
-        Get actual Photo objects for collection.
-        Returns photos in collection order.
+        Get all Photo objects for collection.
+        Returns photos in collection order (complete list - no pagination).
+        
+        Note: Only returns photos, not text cards. Text cards are only in items array.
         """
         collection = self._get_collection_or_404(collection_id, user_id)
         
         if not collection.hothashes:
             return []
         
-        # Get subset of hothashes based on pagination
-        paginated_hothashes = collection.hothashes[skip:skip + limit]
-        
-        # Fetch photos
-        photos = self.photo_repo.get_by_hothashes(paginated_hothashes, user_id)
+        # Fetch all photos
+        photos = self.photo_repo.get_by_hothashes(collection.hothashes, user_id)
         
         # Sort by collection order
         hothash_to_photo = {p.hothash: p for p in photos}
         ordered_photos = [
             hothash_to_photo[h] 
-            for h in paginated_hothashes 
+            for h in collection.hothashes 
             if h in hothash_to_photo
         ]
         

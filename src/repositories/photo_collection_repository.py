@@ -24,8 +24,13 @@ class PhotoCollectionRepository:
             user_id=user_id,
             name=collection_data.name,
             description=collection_data.description,
-            hothashes=collection_data.hothashes or []
+            items=[]  # Initialize empty items array
         )
+        
+        # If hothashes provided, add them as photo items
+        if collection_data.hothashes:
+            collection.add_photos(collection_data.hothashes)
+        
         self.db.add(collection)
         self.db.commit()
         self.db.refresh(collection)

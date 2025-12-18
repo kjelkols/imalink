@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON
 from sqlalchemy.orm import relationship
+from sqlalchemy.orm.attributes import flag_modified
 
 from .base import Base
 from .mixins import TimestampMixin
@@ -129,6 +130,8 @@ class PhotoCollection(Base, TimestampMixin):
             self.items.append(item_copy)
             added += 1
         
+        # Flag the column as modified for SQLAlchemy
+        flag_modified(self, 'items')
         self._sync_hothashes()
         return added
     
@@ -149,6 +152,7 @@ class PhotoCollection(Base, TimestampMixin):
             return False
         
         del self.items[position]
+        flag_modified(self, 'items')
         self._sync_hothashes()
         return True
     
@@ -168,6 +172,7 @@ class PhotoCollection(Base, TimestampMixin):
             if not (item.get('type') == 'photo' and item.get('photo_hothash') in to_remove)
         ]
         
+        flag_modified(self, 'items')
         self._sync_hothashes()
         return original_count - len(self.items)
     
@@ -179,6 +184,7 @@ class PhotoCollection(Base, TimestampMixin):
         """
         # Strip position fields if present
         self.items = [{k: v for k, v in item.items() if k != 'position'} for item in items]
+        flag_modified(self, 'items')
         self._sync_hothashes()
         return True
     
@@ -198,6 +204,9 @@ class PhotoCollection(Base, TimestampMixin):
             item['text_card']['title'] = title
         if body is not None:
             item['text_card']['body'] = body
+        
+        # Flag the column as modified for SQLAlchemy to detect changes
+        flag_modified(self, 'items')
         
         return True
     
