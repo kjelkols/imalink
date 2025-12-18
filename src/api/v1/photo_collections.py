@@ -19,7 +19,6 @@ from src.schemas.photo_collection import (
     PhotoManagementResponse,
     CollectionListResponse
 )
-from src.schemas.photo_schemas import PhotoResponse
 from src.services.photo_collection_service import PhotoCollectionService
 
 
@@ -225,8 +224,8 @@ def update_text_card(
 
 @router.get(
     "/{collection_id}/photos",
-    response_model=List[PhotoResponse],
-    summary="Get photos in collection"
+    response_model=List[str],
+    summary="Get photo hothashes in collection"
 )
 def get_collection_photos(
     collection_id: int,
@@ -234,14 +233,19 @@ def get_collection_photos(
     db: Session = Depends(get_db)
 ):
     """
-    Get all Photo objects in collection.
+    Get list of photo hothashes in collection order.
     
-    Returns all photos in collection order (no pagination - you always need the complete list).
-    Note: This only returns photos, not text cards. Use GET /{collection_id} for full items array.
+    Returns simple array of hothashes (photos only, no text cards).
+    For full items with metadata, use GET /{collection_id} and parse the items array.
     """
     service = PhotoCollectionService(db)
-    photos = service.get_collection_photos(collection_id, current_user.id)
-    return [PhotoResponse.model_validate(p) for p in photos]
+    collection = service.get_collection(collection_id, current_user.id)
+    # Return only photo hothashes from items array
+    return [
+        item['photo_hothash'] 
+        for item in collection.items 
+        if item.get('type') == 'photo'
+    ]
 
 
 @router.post(

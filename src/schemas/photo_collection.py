@@ -75,7 +75,6 @@ class PhotoCollectionResponse(PhotoCollectionBase):
     item_count: int = Field(..., description="Total number of items")
     photo_count: int = Field(..., description="Number of photo items")
     text_card_count: int = Field(..., description="Number of text card items")
-    hothashes: List[str] = Field(default_factory=list, description="Legacy: photo hothashes only")
     cover_photo_hothash: Optional[str] = Field(None, description="First photo (cover)")
     created_at: datetime
     updated_at: datetime

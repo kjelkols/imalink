@@ -31,7 +31,6 @@ class TestPhotoCollectionsAPI:
         assert data["photo_count"] == 0
         assert data["text_card_count"] == 0
         assert data["items"] == []
-        assert data["hothashes"] == []
     
     def test_create_collection_with_photos(
         self, 
@@ -78,7 +77,6 @@ class TestPhotoCollectionsAPI:
         assert data["items"][0]["photo_hothash"] == "abc123"
         assert data["items"][1]["type"] == "photo"
         assert data["items"][1]["photo_hothash"] == "def456"
-        assert data["hothashes"] == ["abc123", "def456"]
     
     def test_add_items_photos_and_text(
         self,
@@ -427,7 +425,7 @@ class TestPhotoCollectionsAPI:
         test_db_session.add(collection)
         test_db_session.commit()
         
-        # Get photos only
+        # Get photos only (just hothashes)
         response = client.get(
             f"/api/v1/collections/{collection.id}/photos",
             headers=auth_headers
@@ -435,10 +433,10 @@ class TestPhotoCollectionsAPI:
         
         assert response.status_code == 200
         data = response.json()
-        # Response is now a simple list, not paginated
+        # Response is simple array of hothashes
         assert isinstance(data, list)
         assert len(data) == 2  # Only 2 photos, text card excluded
-        assert all("hothash" in photo for photo in data)
+        assert data == ["abc", "def"]  # Just hothashes, in order
     
     def test_user_isolation(
         self,
