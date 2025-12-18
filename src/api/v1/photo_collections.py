@@ -16,6 +16,9 @@ from src.schemas.photo_collection import (
     AddPhotosRequest,
     RemovePhotosRequest,
     ReorderPhotosRequest,
+    AddItemsRequest,
+    ReorderItemsRequest,
+    UpdateTextCardRequest,
     PhotoManagementResponse,
     CollectionListResponse
 )
@@ -175,7 +178,7 @@ def remove_photos_from_collection(
 @router.put(
     "/{collection_id}/photos/reorder",
     response_model=PhotoManagementResponse,
-    summary="Reorder photos in collection"
+    summary="Reorder photos in collection (backward compatibility)"
 )
 def reorder_collection_photos(
     collection_id: int,
@@ -184,7 +187,9 @@ def reorder_collection_photos(
     db: Session = Depends(get_db)
 ):
     """
-    Reorder photos in collection.
+    Reorder photos in collection (legacy endpoint - photos only).
+    
+    **Deprecated**: Use PUT /collections/{id}/items/reorder for mixed content support.
     
     - **hothashes**: Complete list of hothashes in new order
     
@@ -193,6 +198,101 @@ def reorder_collection_photos(
     """
     service = PhotoCollectionService(db)
     return service.reorder_photos(collection_id, current_user.id, request)
+
+
+# NEW: Item management endpoints (photos + text cards)
+
+@router.post(
+    "/{collection_id}/items",
+    response_model=PhotoManagementResponse,
+    summary="Add items to collection"
+)
+def add_items_to_collection(
+    collection_id: int,
+    request: AddItemsRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Add items (photos and/or text cards) to collection.
+    
+    Items are appended to end of collection. Duplicate photos are skipped.
+    
+    **Item types:**
+    - Photo: `{"type": "photo", "photo_hothash": "abc123..."}`
+    - Text card: `{"type": "text", "text_card": {"title": "...", "body": "..."}}`
+    
+    **Validation:**
+    - Text card title: max 200 characters
+    - Text card body: max 2000 characters (plain text)
+    - Photos must exist and belong to user
+    """
+    service = PhotoCollectionService(db)
+    return service.add_items(collection_id, current_user.id, request)
+
+
+@router.put(
+    "/{collection_id}/items/reorder",
+    response_model=PhotoManagementResponse,
+    summary="Reorder all items in collection"
+)
+def reorder_collection_items(
+    collection_id: int,
+    request: ReorderItemsRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Reorder all items in collection (photos + text cards).
+    
+    Replaces entire items array with new order. Use for drag-and-drop reordering.
+    
+    **Important:** Must include ALL items you want to keep. Items not in list are removed.
+    """
+    service = PhotoCollectionService(db)
+    return service.reorder_items(collection_id, current_user.id, request)
+
+
+@router.delete(
+    "/{collection_id}/items/{position}",
+    response_model=PhotoManagementResponse,
+    summary="Delete item at position"
+)
+def delete_collection_item(
+    collection_id: int,
+    position: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete item (photo or text card) at specific position.
+    
+    Positions are recalculated automatically for remaining items.
+    """
+    service = PhotoCollectionService(db)
+    return service.delete_item_at_position(collection_id, current_user.id, position)
+
+
+@router.patch(
+    "/{collection_id}/items/{position}",
+    response_model=PhotoManagementResponse,
+    summary="Update text card content"
+)
+def update_text_card(
+    collection_id: int,
+    position: int,
+    request: UpdateTextCardRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update text card content at position.
+    
+    Only works for text cards (returns 400 if position is a photo).
+    Provide title and/or body to update.
+    """
+    service = PhotoCollectionService(db)
+    return service.update_text_card(collection_id, current_user.id, position, request)
 
 
 @router.get(

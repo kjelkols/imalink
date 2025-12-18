@@ -139,3 +139,55 @@ class PhotoCollectionRepository:
             PhotoCollection.name == name
         )
         return self.db.execute(stmt).scalar_one_or_none()
+    
+    # NEW: Item management operations (photos + text cards)
+    
+    def add_items(self, collection: PhotoCollection, items: List[dict]) -> int:
+        """
+        Add items to collection.
+        Returns number of items actually added (excludes duplicate photos).
+        """
+        added_count = collection.add_items(items)
+        if added_count > 0:
+            self.db.commit()
+            self.db.refresh(collection)
+        return added_count
+    
+    def reorder_items(self, collection: PhotoCollection, items: List[dict]) -> bool:
+        """
+        Reorder all items in collection.
+        Returns True if successful.
+        """
+        success = collection.reorder_items(items)
+        if success:
+            self.db.commit()
+            self.db.refresh(collection)
+        return success
+    
+    def remove_item_at_position(self, collection: PhotoCollection, position: int) -> bool:
+        """
+        Remove item at specific position.
+        Returns True if removed, False if position invalid.
+        """
+        success = collection.remove_item_at_position(position)
+        if success:
+            self.db.commit()
+            self.db.refresh(collection)
+        return success
+    
+    def update_text_card(
+        self, 
+        collection: PhotoCollection, 
+        position: int, 
+        title: Optional[str] = None, 
+        body: Optional[str] = None
+    ) -> bool:
+        """
+        Update text card content at position.
+        Returns True if updated, False if position invalid or not a text card.
+        """
+        success = collection.update_text_card(position, title, body)
+        if success:
+            self.db.commit()
+            self.db.refresh(collection)
+        return success

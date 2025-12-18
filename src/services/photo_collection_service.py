@@ -17,6 +17,9 @@ from src.schemas.photo_collection import (
     AddPhotosRequest,
     RemovePhotosRequest,
     ReorderPhotosRequest,
+    AddItemsRequest,
+    ReorderItemsRequest,
+    UpdateTextCardRequest,
     PhotoManagementResponse,
     CollectionListResponse
 )
@@ -128,6 +131,7 @@ class PhotoCollectionService:
         
         return PhotoManagementResponse(
             collection_id=collection.id,
+            item_count=collection.item_count,
             photo_count=collection.photo_count,
             affected_count=added_count,
             cover_photo_hothash=collection.cover_photo_hothash
@@ -150,6 +154,7 @@ class PhotoCollectionService:
         
         return PhotoManagementResponse(
             collection_id=collection.id,
+            item_count=collection.item_count,
             photo_count=collection.photo_count,
             affected_count=removed_count,
             cover_photo_hothash=collection.cover_photo_hothash
@@ -181,6 +186,7 @@ class PhotoCollectionService:
         
         return PhotoManagementResponse(
             collection_id=collection.id,
+            item_count=collection.item_count,
             photo_count=collection.photo_count,
             affected_count=len(request.hothashes),
             cover_photo_hothash=collection.cover_photo_hothash
@@ -258,3 +264,149 @@ class PhotoCollectionService:
         """
         photos = self.photo_repo.get_by_hothashes(hothashes, user_id)
         return {p.hothash for p in photos}
+    
+    # NEW: Item management operations (photos + text cards)
+    
+    def add_items(
+        self,
+        collection_id: int,
+        user_id: int,
+        request: AddItemsRequest
+    ) -> PhotoManagementResponse:
+        """
+        Add items (photos and/or text cards) to collection.
+        Validates photos exist and belong to user.
+        """
+        collection = self._get_collection_or_404(collection_id, user_id)
+        
+        # Validate photo items
+        photo_hothashes = [
+            item['photo_hothash']
+            for item in request.items
+            if item.get('type') == 'photo'
+        ]
+        
+        if photo_hothashes:
+            valid_hothashes = self._validate_user_photos(user_id, photo_hothashes)
+            if len(valid_hothashes) < len(photo_hothashes):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Some photos not found or don't belong to user"
+                )
+        
+        # Add items
+        added_count = self.collection_repo.add_items(collection, request.items)
+        
+        # Refresh
+        self.db.refresh(collection)
+        
+        return PhotoManagementResponse(
+            collection_id=collection.id,
+            item_count=collection.item_count,
+            photo_count=collection.photo_count,
+            affected_count=added_count,
+            cover_photo_hothash=collection.cover_photo_hothash
+        )
+    
+    def reorder_items(
+        self,
+        collection_id: int,
+        user_id: int,
+        request: ReorderItemsRequest
+    ) -> PhotoManagementResponse:
+        """
+        Reorder all items in collection.
+        Validates photos exist and belong to user.
+        """
+        collection = self._get_collection_or_404(collection_id, user_id)
+        
+        # Validate photo items
+        photo_hothashes = [
+            item['photo_hothash']
+            for item in request.items
+            if item.get('type') == 'photo'
+        ]
+        
+        if photo_hothashes:
+            valid_hothashes = self._validate_user_photos(user_id, photo_hothashes)
+            if len(valid_hothashes) < len(photo_hothashes):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Some photos not found or don't belong to user"
+                )
+        
+        # Reorder items
+        self.collection_repo.reorder_items(collection, request.items)
+        
+        # Refresh
+        self.db.refresh(collection)
+        
+        return PhotoManagementResponse(
+            collection_id=collection.id,
+            item_count=collection.item_count,
+            photo_count=collection.photo_count,
+            affected_count=len(request.items),
+            cover_photo_hothash=collection.cover_photo_hothash
+        )
+    
+    def delete_item_at_position(
+        self,
+        collection_id: int,
+        user_id: int,
+        position: int
+    ) -> PhotoManagementResponse:
+        """Delete item at specific position"""
+        collection = self._get_collection_or_404(collection_id, user_id)
+        
+        success = self.collection_repo.remove_item_at_position(collection, position)
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid position: {position}"
+            )
+        
+        # Refresh
+        self.db.refresh(collection)
+        
+        return PhotoManagementResponse(
+            collection_id=collection.id,
+            item_count=collection.item_count,
+            photo_count=collection.photo_count,
+            affected_count=1,
+            cover_photo_hothash=collection.cover_photo_hothash
+        )
+    
+    def update_text_card(
+        self,
+        collection_id: int,
+        user_id: int,
+        position: int,
+        request: UpdateTextCardRequest
+    ) -> PhotoManagementResponse:
+        """Update text card content at position"""
+        collection = self._get_collection_or_404(collection_id, user_id)
+        
+        success = self.collection_repo.update_text_card(
+            collection,
+            position,
+            request.title,
+            request.body
+        )
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Position {position} is not a text card or is invalid"
+            )
+        
+        # Refresh
+        self.db.refresh(collection)
+        
+        return PhotoManagementResponse(
+            collection_id=collection.id,
+            item_count=collection.item_count,
+            photo_count=collection.photo_count,
+            affected_count=1,
+            cover_photo_hothash=collection.cover_photo_hothash
+        )
