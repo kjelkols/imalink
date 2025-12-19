@@ -3119,6 +3119,133 @@ Content-Type: application/json
 - Both fields are optional - send only what you want to update
 - Title max 200 chars, body max 2000 chars
 
+---
+
+## Atomic Item Operations (Efficient Editing)
+
+For performance-critical operations, use these atomic endpoints instead of full reorder.
+
+### Insert Items at Position
+
+```http
+POST /api/v1/collections/{id}/items/insert
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "position": 61,
+  "items": [
+    {"type": "text", "text_card": {"title": "Chapter 3", "body": "..."}},
+    {"type": "photo", "photo_hothash": "abc123..."}
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "collection_id": 1,
+  "item_count": 277,
+  "photo_count": 200,
+  "affected_count": 2,
+  "cover_photo_hothash": "..."
+}
+```
+
+**Position Rules:**
+- `position: 0` - Insert at beginning (before first item)
+- `position: len(items)` - Append to end
+- `position: 61` - Insert before current item at position 61
+- Items from `position` onwards are shifted up
+
+**Validation:**
+- Position must be 0 to `len(items)` (inclusive)
+- Photos must exist and belong to user
+- Returns 400 if invalid position
+- Returns 404 if photo not found
+
+**Use Case:** Insert items in middle without sending entire collection (efficient for large collections).
+
+### Move Items
+
+```http
+POST /api/v1/collections/{id}/items/move
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "from_position": 100,
+  "count": 5,
+  "to_position": 50
+}
+```
+
+**Response:**
+```json
+{
+  "collection_id": 1,
+  "item_count": 276,
+  "photo_count": 200,
+  "affected_count": 5,
+  "cover_photo_hothash": "..."
+}
+```
+
+**Behavior:**
+- Extract `count` items starting at `from_position`
+- Insert them at `to_position`
+- Other items shift accordingly
+- Atomic operation (single database transaction)
+
+**Validation:**
+- `from_position + count` must be ≤ `len(items)`
+- `to_position` must be 0 to `len(items) - count`
+- Returns 400 if invalid range
+
+**Use Case:** Reorder sections without sending entire collection (e.g., move chapter with 5 items).
+
+### Delete Items Range
+
+```http
+POST /api/v1/collections/{id}/items/delete
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "position": 61,
+  "count": 3
+}
+```
+
+**Response:**
+```json
+{
+  "collection_id": 1,
+  "item_count": 273,
+  "photo_count": 198,
+  "affected_count": 3,
+  "cover_photo_hothash": "..."
+}
+```
+
+**Behavior:**
+- Delete `count` items starting at `position`
+- Items after are shifted down
+- Atomic operation
+
+**Validation:**
+- `position + count` must be ≤ `len(items)`
+- Returns 400 if invalid range
+
+**Use Case:** Delete multiple consecutive items efficiently.
+
+**Performance Comparison:**
+```
+Old: Append + Full Reorder (3 API calls, 276 items payload)
+New: Insert at Position (1 API call, 2 items payload)
+Result: 99% smaller payload, 3x fewer API calls
+```
+
 ### Cleanup Invalid Photos
 
 ```http
@@ -3140,6 +3267,7 @@ Authorization: Bearer {token}
 
 ---
 
-**Last Updated:** December 18, 2025  
-**API Version:** 3.2 (Collections with Text Cards + Items Array)  
+**Last Updated:** December 19, 2025  
+**API Version:** 3.3 (Atomic Item Operations + Collections with Text Cards)  
 **Backend Version:** Fase 1 (Multi-User + Events + PhotoStacks + Collections with Mixed Content)
+
