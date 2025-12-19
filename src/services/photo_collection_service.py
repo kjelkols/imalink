@@ -17,6 +17,9 @@ from src.schemas.photo_collection import (
     AddItemsRequest,
     ReorderItemsRequest,
     UpdateTextCardRequest,
+    InsertItemsRequest,
+    MoveItemsRequest,
+    DeleteItemsRequest,
     PhotoManagementResponse,
     CollectionListResponse
 )
@@ -300,5 +303,136 @@ class PhotoCollectionService:
             item_count=collection.item_count,
             photo_count=collection.photo_count,
             affected_count=1,
+            cover_photo_hothash=collection.cover_photo_hothash
+        )
+# Service methods
+
+    def insert_items_at_position(
+        self,
+        collection_id: int,
+        user_id: int,
+        request: InsertItemsRequest
+    ) -> PhotoManagementResponse:
+        """Insert items at specific position (atomic operation)"""
+        collection = self._get_collection_or_404(collection_id, user_id)
+        
+        if request.position < 0 or request.position > len(collection.items or []):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid position: {request.position}. Must be 0 to {len(collection.items or [])}"
+            )
+        
+        photo_hothashes = [
+            item['photo_hothash']
+            for item in request.items
+            if item.get('type') == 'photo'
+        ]
+        
+        if photo_hothashes:
+            valid_hothashes = self._validate_user_photos(user_id, photo_hothashes)
+            if len(valid_hothashes) < len(photo_hothashes):
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Some photos not found or don't belong to user"
+                )
+        
+        success, affected_positions = collection.insert_items_at_position(request.position, request.items)
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to insert items at position {request.position}"
+            )
+        
+        self.db.commit()
+        self.db.refresh(collection)
+        
+        return PhotoManagementResponse(
+            collection_id=collection.id,
+            item_count=collection.item_count,
+            photo_count=collection.photo_count,
+            affected_count=len(affected_positions),
+            cover_photo_hothash=collection.cover_photo_hothash
+        )
+    
+    def move_items(
+        self,
+        collection_id: int,
+        user_id: int,
+        request: MoveItemsRequest
+    ) -> PhotoManagementResponse:
+        """Move items from one position to another (atomic operation)"""
+        collection = self._get_collection_or_404(collection_id, user_id)
+        
+        items_count = len(collection.items or [])
+        
+        if request.from_position < 0 or request.from_position + request.count > items_count:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid from_position/count: {request.from_position}/{request.count}"
+            )
+        
+        if request.to_position < 0 or request.to_position > items_count - request.count:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid to_position: {request.to_position}"
+            )
+        
+        success, affected_range = collection.move_items(
+            request.from_position,
+            request.count,
+            request.to_position
+        )
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to move items"
+            )
+        
+        self.db.commit()
+        self.db.refresh(collection)
+        
+        return PhotoManagementResponse(
+            collection_id=collection.id,
+            item_count=collection.item_count,
+            photo_count=collection.photo_count,
+            affected_count=request.count,
+            cover_photo_hothash=collection.cover_photo_hothash
+        )
+    
+    def delete_items_at_position(
+        self,
+        collection_id: int,
+        user_id: int,
+        request: DeleteItemsRequest
+    ) -> PhotoManagementResponse:
+        """Delete items at specific position (atomic operation)"""
+        collection = self._get_collection_or_404(collection_id, user_id)
+        
+        items_count = len(collection.items or [])
+        
+        if request.position < 0 or request.position + request.count > items_count:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid position/count: {request.position}/{request.count}"
+            )
+        
+        success = collection.delete_items_at_position(request.position, request.count)
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to delete items"
+            )
+        
+        self.db.commit()
+        self.db.refresh(collection)
+        
+        return PhotoManagementResponse(
+            collection_id=collection.id,
+            item_count=collection.item_count,
+            photo_count=collection.photo_count,
+            affected_count=request.count,
             cover_photo_hothash=collection.cover_photo_hothash
         )

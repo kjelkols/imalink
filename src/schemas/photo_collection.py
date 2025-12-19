@@ -150,6 +150,51 @@ class UpdateTextCardRequest(BaseModel):
         return v.strip() if v is not None else None
 
 
+class InsertItemsRequest(BaseModel):
+    """Request to insert items at specific position"""
+    position: int = Field(..., ge=0, description="Insert position (0-based, can be at end)")
+    items: List[Dict[str, Any]] = Field(..., min_length=1, description="Items to insert")
+    
+    @field_validator('items')
+    @classmethod
+    def validate_items(cls, v: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        if not v:
+            raise ValueError('Must provide at least one item')
+        
+        for item in v:
+            item_type = item.get('type')
+            if item_type == 'photo':
+                if 'photo_hothash' not in item or not item['photo_hothash']:
+                    raise ValueError('Photo items must have photo_hothash')
+            elif item_type == 'text':
+                if 'text_card' not in item:
+                    raise ValueError('Text items must have text_card')
+                card = item['text_card']
+                if not isinstance(card, dict) or 'title' not in card or 'body' not in card:
+                    raise ValueError('text_card must have title and body')
+                if len(card['title']) > 200:
+                    raise ValueError('Text card title max 200 characters')
+                if len(card['body']) > 2000:
+                    raise ValueError('Text card body max 2000 characters')
+            else:
+                raise ValueError(f'Invalid item type: {item_type}. Must be "photo" or "text"')
+        
+        return v
+
+
+class MoveItemsRequest(BaseModel):
+    """Request to move items from one position to another"""
+    from_position: int = Field(..., ge=0, description="Start position to move from")
+    count: int = Field(..., ge=1, description="Number of items to move")
+    to_position: int = Field(..., ge=0, description="Target position to move to")
+
+
+class DeleteItemsRequest(BaseModel):
+    """Request to delete items at specific position"""
+    position: int = Field(..., ge=0, description="Start position to delete from")
+    count: int = Field(..., ge=1, description="Number of items to delete")
+
+
 class PhotoManagementResponse(BaseModel):
     """Response for photo add/remove/reorder operations"""
     collection_id: int

@@ -130,6 +130,75 @@ class PhotoCollection(Base, TimestampMixin):
         flag_modified(self, 'items')
         return added
     
+    def insert_items_at_position(self, position: int, new_items: List[dict]) -> tuple[bool, List[int]]:
+        """
+        Insert items at specific position.
+        Returns (success, list of affected positions).
+        """
+        if not self.items:
+            self.items = []
+        
+        if position < 0 or position > len(self.items):
+            return False, []
+        
+        # Strip position field if present
+        items_to_insert = [{k: v for k, v in item.items() if k != 'position'} for item in new_items]
+        
+        # Insert at position (Python list insert)
+        for i, item in enumerate(items_to_insert):
+            self.items.insert(position + i, item)
+        
+        affected_positions = list(range(position, position + len(items_to_insert)))
+        
+        flag_modified(self, 'items')
+        return True, affected_positions
+    
+    def move_items(self, from_position: int, count: int, to_position: int) -> tuple[bool, List[int]]:
+        """
+        Move items from one position to another.
+        Returns (success, affected range [min, max]).
+        """
+        if not self.items:
+            return False, []
+        
+        if from_position < 0 or from_position + count > len(self.items):
+            return False, []
+        
+        if to_position < 0 or to_position > len(self.items) - count:
+            return False, []
+        
+        # Extract items to move
+        items_to_move = self.items[from_position:from_position + count]
+        
+        # Remove from old position
+        del self.items[from_position:from_position + count]
+        
+        # Insert at new position
+        for i, item in enumerate(items_to_move):
+            self.items.insert(to_position + i, item)
+        
+        # Calculate affected range
+        min_pos = min(from_position, to_position)
+        max_pos = max(from_position + count - 1, to_position + count - 1)
+        
+        flag_modified(self, 'items')
+        return True, [min_pos, max_pos]
+    
+    def delete_items_at_position(self, position: int, count: int) -> bool:
+        """
+        Delete count items starting at position.
+        Returns True if successful, False if invalid range.
+        """
+        if not self.items:
+            return False
+        
+        if position < 0 or position + count > len(self.items):
+            return False
+        
+        del self.items[position:position + count]
+        flag_modified(self, 'items')
+        return True
+    
     def remove_item_at_position(self, position: int) -> bool:
         """
         Remove item at specific position (array index).

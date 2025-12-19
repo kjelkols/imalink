@@ -14,6 +14,9 @@ from src.schemas.photo_collection import (
     AddItemsRequest,
     ReorderItemsRequest,
     UpdateTextCardRequest,
+    InsertItemsRequest,
+    MoveItemsRequest,
+    DeleteItemsRequest,
     PhotoManagementResponse,
     CollectionListResponse
 )
@@ -241,3 +244,75 @@ def cleanup_collection(
         "collection_id": collection_id,
         "removed_count": removed_count
     }
+
+
+@router.post(
+    "/{collection_id}/items/insert",
+    response_model=PhotoManagementResponse,
+    summary="Insert items at specific position"
+)
+def insert_items_at_position(
+    collection_id: int,
+    request: InsertItemsRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Insert items at specific position (atomic operation).
+    
+    - **position**: 0 to len(items) (inclusive) - 0 = insert first, len(items) = append
+    - **items**: Array of items to insert (photos and/or text cards)
+    
+    Items are inserted BEFORE the current item at position.
+    Existing items from position onwards are shifted up.
+    """
+    service = PhotoCollectionService(db)
+    return service.insert_items_at_position(collection_id, current_user.id, request)
+
+
+@router.post(
+    "/{collection_id}/items/move",
+    response_model=PhotoManagementResponse,
+    summary="Move items from one position to another"
+)
+def move_items(
+    collection_id: int,
+    request: MoveItemsRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Move items from one position to another (atomic operation).
+    
+    - **from_position**: Start position to move from
+    - **count**: Number of items to move
+    - **to_position**: Target position to move to
+    
+    Items are removed from from_position and inserted at to_position.
+    """
+    service = PhotoCollectionService(db)
+    return service.move_items(collection_id, current_user.id, request)
+
+
+@router.post(
+    "/{collection_id}/items/delete",
+    response_model=PhotoManagementResponse,
+    summary="Delete items at specific position"
+)
+def delete_items_at_position(
+    collection_id: int,
+    request: DeleteItemsRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete items at specific position (atomic operation).
+    
+    - **position**: Start position to delete from
+    - **count**: Number of items to delete
+    
+    Items from position to position+count-1 are deleted.
+    Remaining items are shifted down.
+    """
+    service = PhotoCollectionService(db)
+    return service.delete_items_at_position(collection_id, current_user.id, request)
