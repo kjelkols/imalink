@@ -62,16 +62,31 @@ class PhotoCollectionService:
     
     def get_collection(self, collection_id: int, user_id: int) -> PhotoCollectionResponse:
         """Get collection by ID"""
+        from src.schemas.photo_collection import normalize_collection_items
+        
         collection = self._get_collection_or_404(collection_id, user_id)
-        return PhotoCollectionResponse.model_validate(collection)
+        response = PhotoCollectionResponse.model_validate(collection)
+        
+        # Normalize items to ensure visible field exists
+        response.items = normalize_collection_items(response.items)
+        
+        return response
     
     def list_collections(self, user_id: int, skip: int = 0, limit: int = 100) -> CollectionListResponse:
         """List all collections for user"""
+        from src.schemas.photo_collection import normalize_collection_items
+        
         collections = self.collection_repo.get_all_for_user(user_id, skip, limit)
         total = self.collection_repo.count_for_user(user_id)
         
+        collection_responses = []
+        for c in collections:
+            response = PhotoCollectionResponse.model_validate(c)
+            response.items = normalize_collection_items(response.items)
+            collection_responses.append(response)
+        
         return CollectionListResponse(
-            collections=[PhotoCollectionResponse.model_validate(c) for c in collections],
+            collections=collection_responses,
             total=total
         )
     
@@ -189,8 +204,16 @@ class PhotoCollectionService:
                     detail="Some photos not found or don't belong to user"
                 )
         
+        # Add visible=true to all new items (default visibility)
+        items_with_visibility = []
+        for item in request.items:
+            item_copy = dict(item)
+            if "visible" not in item_copy:
+                item_copy["visible"] = True
+            items_with_visibility.append(item_copy)
+        
         # Add items
-        added_count = self.collection_repo.add_items(collection, request.items)
+        added_count = self.collection_repo.add_items(collection, items_with_visibility)
         
         # Refresh
         self.db.refresh(collection)
@@ -336,7 +359,15 @@ class PhotoCollectionService:
                     detail="Some photos not found or don't belong to user"
                 )
         
-        success, affected_positions = collection.insert_items_at_position(request.position, request.items)
+        # Add visible=true to all new items (default visibility)
+        items_with_visibility = []
+        for item in request.items:
+            item_copy = dict(item)
+            if "visible" not in item_copy:
+                item_copy["visible"] = True
+            items_with_visibility.append(item_copy)
+        
+        success, affected_positions = collection.insert_items_at_position(request.position, items_with_visibility)
         
         if not success:
             raise HTTPException(
@@ -436,3 +467,45 @@ class PhotoCollectionService:
             affected_count=request.count,
             cover_photo_hothash=collection.cover_photo_hothash
         )
+    
+    def toggle_item_visibility(
+        self,
+        collection_id: int,
+        user_id: int,
+        position: int,
+        visible: bool
+    ) -> dict:
+        """Toggle visibility of item at specific position"""
+        from datetime import datetime
+        from sqlalchemy.orm.attributes import flag_modified
+        
+        collection = self._get_collection_or_404(collection_id, user_id)
+        
+        items = collection.items or []
+        if position < 0 or position >= len(items):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid position: {position}. Must be 0 to {len(items)-1}"
+            )
+        
+        # Update visibility
+        items = list(items)  # Make mutable copy
+        items[position]["visible"] = visible
+        
+        # Save to database
+        collection.items = items
+        collection.updated_at = datetime.utcnow()
+        flag_modified(collection, "items")
+        self.db.commit()
+        self.db.refresh(collection)
+        
+        # Count visible items
+        visible_count = sum(1 for item in items if item.get("visible", True))
+        
+        return {
+            "collection_id": collection_id,
+            "position": position,
+            "visible": visible,
+            "item_count": len(items),
+            "visible_count": visible_count
+        }

@@ -2906,10 +2906,10 @@ Authorization: Bearer {token}
   "name": "Best of 2024",
   "description": "My favorite photos from 2024",
   "items": [
-    {"type": "photo", "photo_hothash": "abc123..."},
-    {"type": "text", "text_card": {"title": "Summer Memories", "body": "These photos are from..."}},
-    {"type": "photo", "photo_hothash": "def456..."},
-    {"type": "photo", "photo_hothash": "ghi789..."}
+    {"type": "photo", "photo_hothash": "abc123...", "visible": true},
+    {"type": "text", "text_card": {"title": "Summer Memories", "body": "These photos are from..."}, "visible": true},
+    {"type": "photo", "photo_hothash": "def456...", "visible": false},
+    {"type": "photo", "photo_hothash": "ghi789...", "visible": true}
   ],
   "item_count": 52,
   "photo_count": 45,
@@ -2920,7 +2920,10 @@ Authorization: Bearer {token}
 }
 ```
 
-**Note:** Position is implicit from array index (first item = position 0).
+**Note:** 
+- Position is implicit from array index (first item = position 0)
+- All items include `visible` field (default `true` for backward compatibility)
+- `visible: false` items are hidden from slideshow but preserved in collection
 
 **Extracting Photos from Items (Frontend Pattern):**
 ```javascript
@@ -2931,6 +2934,14 @@ const collection = await api.getCollection(id);
 const photoHothashes = collection.items
   .filter(item => item.type === 'photo')
   .map(item => item.photo_hothash);
+
+// Filter for slideshow (visible items only)
+const slideshowItems = collection.items
+  .filter(item => item.visible !== false);
+
+// Count visible items
+const visibleCount = collection.items
+  .filter(item => item.visible !== false).length;
 ```
 
 ### Create Collection
@@ -3023,8 +3034,11 @@ Content-Type: application/json
 ```
 
 **Item Types:**
-- **Photo**: `{"type": "photo", "photo_hothash": "abc123..."}`
-- **Text Card**: `{"type": "text", "text_card": {"title": "...", "body": "..."}}`
+- **Photo**: `{"type": "photo", "photo_hothash": "abc123...", "visible": true}`
+- **Text Card**: `{"type": "text", "text_card": {"title": "...", "body": "..."}, "visible": true}`
+
+**Optional Fields:**
+- `visible` (boolean): Controls slideshow visibility (default: `true`)
 
 **Validation:**
 - Text card title: max 200 characters
@@ -3246,6 +3260,64 @@ New: Insert at Position (1 API call, 2 items payload)
 Result: 99% smaller payload, 3x fewer API calls
 ```
 
+### Toggle Item Visibility
+
+Control which items are visible in slideshow view while keeping them in the collection.
+
+```http
+PATCH /api/v1/collections/{id}/items/{position}/visibility
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "visible": false
+}
+```
+
+**Response:**
+```json
+{
+  "collection_id": 3,
+  "position": 61,
+  "visible": false,
+  "item_count": 275,
+  "visible_count": 40
+}
+```
+
+**Use Case: Slideshow Curation**
+```
+Scenario: Create 40-photo slideshow from 275 photos
+
+1. Add all 275 photos to collection in correct order
+2. Hide 235 photos (set visible=false)
+3. Slideshow displays only 40 visible items
+4. Easy to toggle visibility to test different combinations
+5. Collection view shows ALL items (hidden rendered gray/dimmed)
+```
+
+**Behavior:**
+- `visible: true` - Item appears in slideshow (default)
+- `visible: false` - Item hidden from slideshow but preserved in collection
+- Both photos and text cards can be hidden
+- Hidden items preserved when moving/reordering
+- New items default to `visible: true`
+
+**Backward Compatibility:**
+- Old items without `visible` field automatically default to `true`
+- GET endpoints normalize all items to include `visible` field
+
+**Validation:**
+- Position must be 0 to `len(items) - 1`
+- `visible` must be boolean (true/false)
+- Returns 400 if invalid position
+- Returns 422 if invalid type
+
+**Performance:**
+- No payload overhead - just position + boolean
+- Toggle 235 items individually: 235 small API calls
+- Alternative: Use reorder with visibility fields (1 large call)
+
 ### Cleanup Invalid Photos
 
 ```http
@@ -3267,7 +3339,7 @@ Authorization: Bearer {token}
 
 ---
 
-**Last Updated:** December 19, 2025  
-**API Version:** 3.3 (Atomic Item Operations + Collections with Text Cards)  
+**Last Updated:** December 20, 2025  
+**API Version:** 3.4 (Item Visibility + Atomic Operations + Collections with Text Cards)  
 **Backend Version:** Fase 1 (Multi-User + Events + PhotoStacks + Collections with Mixed Content)
 

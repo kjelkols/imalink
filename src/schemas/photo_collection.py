@@ -7,6 +7,18 @@ from typing import List, Optional, Dict, Any, Literal
 from pydantic import BaseModel, Field, field_validator
 
 
+# Helper functions
+def normalize_collection_items(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Ensure all items have visible field (default true).
+    This provides backward compatibility for items created before visibility feature.
+    """
+    for item in items:
+        if "visible" not in item:
+            item["visible"] = True
+    return items
+
+
 # Collection item schemas
 class TextCardContent(BaseModel):
     """Text card content"""
@@ -193,6 +205,20 @@ class DeleteItemsRequest(BaseModel):
     """Request to delete items at specific position"""
     position: int = Field(..., ge=0, description="Start position to delete from")
     count: int = Field(..., ge=1, description="Number of items to delete")
+
+
+class ToggleVisibilityRequest(BaseModel):
+    """Request to toggle visibility of item at position"""
+    visible: bool = Field(..., description="True to show, False to hide")
+
+
+class ToggleVisibilityResponse(BaseModel):
+    """Response for visibility toggle operation"""
+    collection_id: int
+    position: int = Field(..., description="Position of toggled item")
+    visible: bool = Field(..., description="New visibility state")
+    item_count: int = Field(..., description="Total items in collection")
+    visible_count: int = Field(..., description="Number of visible items")
 
 
 class PhotoManagementResponse(BaseModel):

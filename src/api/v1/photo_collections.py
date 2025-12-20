@@ -17,6 +17,8 @@ from src.schemas.photo_collection import (
     InsertItemsRequest,
     MoveItemsRequest,
     DeleteItemsRequest,
+    ToggleVisibilityRequest,
+    ToggleVisibilityResponse,
     PhotoManagementResponse,
     CollectionListResponse
 )
@@ -316,3 +318,28 @@ def delete_items_at_position(
     """
     service = PhotoCollectionService(db)
     return service.delete_items_at_position(collection_id, current_user.id, request)
+
+
+@router.patch(
+    "/{collection_id}/items/{position}/visibility",
+    response_model=ToggleVisibilityResponse,
+    summary="Toggle visibility of item at position"
+)
+def toggle_item_visibility(
+    collection_id: int,
+    position: int,
+    request: ToggleVisibilityRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Toggle visibility of item at specific position.
+    
+    - **position**: Index of item to toggle (0-based)
+    - **visible**: True to show, False to hide
+    
+    Hidden items are preserved in collection but filtered in slideshow view.
+    Returns total item count and visible item count.
+    """
+    service = PhotoCollectionService(db)
+    return service.toggle_item_visibility(collection_id, current_user.id, position, request.visible)
