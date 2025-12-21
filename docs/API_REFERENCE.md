@@ -2906,10 +2906,10 @@ Authorization: Bearer {token}
   "name": "Best of 2024",
   "description": "My favorite photos from 2024",
   "items": [
-    {"type": "photo", "photo_hothash": "abc123...", "visible": true},
+    {"type": "photo", "photo_hothash": "abc123...", "visible": true, "caption": "Beautiful sunset"},
     {"type": "text", "text_card": {"title": "Summer Memories", "body": "These photos are from..."}, "visible": true},
-    {"type": "photo", "photo_hothash": "def456...", "visible": false},
-    {"type": "photo", "photo_hothash": "ghi789...", "visible": true}
+    {"type": "photo", "photo_hothash": "def456...", "visible": false, "caption": null},
+    {"type": "photo", "photo_hothash": "ghi789...", "visible": true, "caption": "Family gathering"}
   ],
   "item_count": 52,
   "photo_count": 45,
@@ -2923,6 +2923,7 @@ Authorization: Bearer {token}
 **Note:** 
 - Position is implicit from array index (first item = position 0)
 - All items include `visible` field (default `true` for backward compatibility)
+- Photo items include `caption` field (default `null` for backward compatibility)
 - `visible: false` items are hidden from slideshow but preserved in collection
 
 **Extracting Photos from Items (Frontend Pattern):**
@@ -3034,13 +3035,15 @@ Content-Type: application/json
 ```
 
 **Item Types:**
-- **Photo**: `{"type": "photo", "photo_hothash": "abc123...", "visible": true}`
+- **Photo**: `{"type": "photo", "photo_hothash": "abc123...", "visible": true, "caption": "Optional text"}`
 - **Text Card**: `{"type": "text", "text_card": {"title": "...", "body": "..."}, "visible": true}`
 
 **Optional Fields:**
 - `visible` (boolean): Controls slideshow visibility (default: `true`)
+- `caption` (string): Descriptive text for photos only (max 1000 chars, default: `null`)
 
 **Validation:**
+- Caption: max 1000 characters (plain text, photos only)
 - Text card title: max 200 characters
 - Text card body: max 2000 characters (plain text)
 - Photos must exist and belong to user
@@ -3318,6 +3321,62 @@ Scenario: Create 40-photo slideshow from 275 photos
 - Toggle 235 items individually: 235 small API calls
 - Alternative: Use reorder with visibility fields (1 large call)
 
+### Update Photo Caption
+
+Add descriptive text to photo items for photo books, portfolios, and presentations.
+
+```http
+PATCH /api/v1/collections/{id}/items/{position}/caption
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "caption": "Emma sin første bursdag, 15. mai 2024"
+}
+```
+
+**Response:**
+```json
+{
+  "collection_id": 3,
+  "position": 61,
+  "caption": "Emma sin første bursdag, 15. mai 2024",
+  "item_count": 275
+}
+```
+
+**Use Cases:**
+```
+Photo Book: "Emma sin første bursdag, 15. mai 2024"
+Portfolio: "Shot with Canon 5D Mark IV, f/2.8, 1/250s"
+Photo Essay: "Demonstranter samlet seg utenfor Stortinget kl 14:00"
+Family Album: "Bestemor og meg på hytta, sommer 1995"
+```
+
+**Behavior:**
+- **Collection-specific**: Same photo can have different captions in different collections
+- **Plain text**: No formatting support (max 1000 characters)
+- **Optional**: Set to `null` to remove caption
+- **Only photos**: Text cards cannot have captions (they have title/body instead)
+- **Preserved**: Caption maintained across move/insert operations
+
+**Remove Caption:**
+```http
+PATCH /api/v1/collections/{id}/items/{position}/caption
+{"caption": null}
+```
+
+**Backward Compatibility:**
+- Old photo items without `caption` field get `caption: null` on GET
+- New items added without caption default to `null`
+
+**Validation:**
+- Position must be 0 to `len(items) - 1`
+- Caption max 1000 characters (plain text)
+- Only photo items (returns 400 for text cards)
+- Whitespace automatically trimmed
+- Returns 400 if invalid position
+
 ### Cleanup Invalid Photos
 
 ```http
@@ -3339,7 +3398,7 @@ Authorization: Bearer {token}
 
 ---
 
-**Last Updated:** December 20, 2025  
-**API Version:** 3.4 (Item Visibility + Atomic Operations + Collections with Text Cards)  
+**Last Updated:** December 21, 2025  
+**API Version:** 3.5 (Photo Captions + Item Visibility + Atomic Operations + Collections)  
 **Backend Version:** Fase 1 (Multi-User + Events + PhotoStacks + Collections with Mixed Content)
 
