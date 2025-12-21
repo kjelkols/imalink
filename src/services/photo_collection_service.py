@@ -204,16 +204,19 @@ class PhotoCollectionService:
                     detail="Some photos not found or don't belong to user"
                 )
         
-        # Add visible=true to all new items (default visibility)
-        items_with_visibility = []
+        # Add visible=true and caption=None to all new items (default values)
+        items_with_defaults = []
         for item in request.items:
             item_copy = dict(item)
             if "visible" not in item_copy:
                 item_copy["visible"] = True
-            items_with_visibility.append(item_copy)
+            # Add caption default for photo items
+            if item_copy.get("type") == "photo" and "caption" not in item_copy:
+                item_copy["caption"] = None
+            items_with_defaults.append(item_copy)
         
         # Add items
-        added_count = self.collection_repo.add_items(collection, items_with_visibility)
+        added_count = self.collection_repo.add_items(collection, items_with_defaults)
         
         # Refresh
         self.db.refresh(collection)
@@ -359,15 +362,18 @@ class PhotoCollectionService:
                     detail="Some photos not found or don't belong to user"
                 )
         
-        # Add visible=true to all new items (default visibility)
-        items_with_visibility = []
+        # Add visible=true and caption=None to all new items (default values)
+        items_with_defaults = []
         for item in request.items:
             item_copy = dict(item)
             if "visible" not in item_copy:
                 item_copy["visible"] = True
-            items_with_visibility.append(item_copy)
+            # Add caption default for photo items
+            if item_copy.get("type") == "photo" and "caption" not in item_copy:
+                item_copy["caption"] = None
+            items_with_defaults.append(item_copy)
         
-        success, affected_positions = collection.insert_items_at_position(request.position, items_with_visibility)
+        success, affected_positions = collection.insert_items_at_position(request.position, items_with_defaults)
         
         if not success:
             raise HTTPException(
@@ -508,4 +514,49 @@ class PhotoCollectionService:
             "visible": visible,
             "item_count": len(items),
             "visible_count": visible_count
+        }
+    
+    def update_item_caption(
+        self,
+        collection_id: int,
+        user_id: int,
+        position: int,
+        caption: Optional[str]
+    ) -> dict:
+        """Update caption of photo item at specific position"""
+        from datetime import datetime
+        from sqlalchemy.orm.attributes import flag_modified
+        
+        collection = self._get_collection_or_404(collection_id, user_id)
+        
+        items = collection.items or []
+        if position < 0 or position >= len(items):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid position: {position}. Must be 0 to {len(items)-1}"
+            )
+        
+        # Verify it's a photo item
+        if items[position].get("type") != "photo":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Item at position {position} is not a photo. Only photos can have captions."
+            )
+        
+        # Update caption
+        items = list(items)  # Make mutable copy
+        items[position]["caption"] = caption
+        
+        # Save to database
+        collection.items = items
+        collection.updated_at = datetime.utcnow()
+        flag_modified(collection, "items")
+        self.db.commit()
+        self.db.refresh(collection)
+        
+        return {
+            "collection_id": collection_id,
+            "position": position,
+            "caption": caption,
+            "item_count": len(items)
         }

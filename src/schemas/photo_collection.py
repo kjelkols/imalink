@@ -10,12 +10,15 @@ from pydantic import BaseModel, Field, field_validator
 # Helper functions
 def normalize_collection_items(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    Ensure all items have visible field (default true).
-    This provides backward compatibility for items created before visibility feature.
+    Ensure all items have visible and caption fields with defaults.
+    This provides backward compatibility for items created before these features.
     """
     for item in items:
         if "visible" not in item:
             item["visible"] = True
+        # Caption only applies to photos
+        if item.get("type") == "photo" and "caption" not in item:
+            item["caption"] = None
     return items
 
 
@@ -35,6 +38,13 @@ class CollectionItemPhoto(BaseModel):
     """Photo item in collection (position is implicit from array index)"""
     type: Literal['photo'] = 'photo'
     photo_hothash: str = Field(..., min_length=1)
+    visible: Optional[bool] = True
+    caption: Optional[str] = Field(None, max_length=1000, description="Optional caption text")
+    
+    @field_validator('caption')
+    @classmethod
+    def strip_caption_whitespace(cls, v: Optional[str]) -> Optional[str]:
+        return v.strip() if v else None
 
 
 class CollectionItemText(BaseModel):
@@ -219,6 +229,24 @@ class ToggleVisibilityResponse(BaseModel):
     visible: bool = Field(..., description="New visibility state")
     item_count: int = Field(..., description="Total items in collection")
     visible_count: int = Field(..., description="Number of visible items")
+
+
+class UpdateCaptionRequest(BaseModel):
+    """Request to update caption of photo item"""
+    caption: Optional[str] = Field(None, max_length=1000, description="Caption text (null to remove)")
+    
+    @field_validator('caption')
+    @classmethod
+    def strip_caption_whitespace(cls, v: Optional[str]) -> Optional[str]:
+        return v.strip() if v else None
+
+
+class UpdateCaptionResponse(BaseModel):
+    """Response for caption update operation"""
+    collection_id: int
+    position: int = Field(..., description="Position of updated item")
+    caption: Optional[str] = Field(None, description="New caption text")
+    item_count: int = Field(..., description="Total items in collection")
 
 
 class PhotoManagementResponse(BaseModel):

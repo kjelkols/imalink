@@ -19,6 +19,8 @@ from src.schemas.photo_collection import (
     DeleteItemsRequest,
     ToggleVisibilityRequest,
     ToggleVisibilityResponse,
+    UpdateCaptionRequest,
+    UpdateCaptionResponse,
     PhotoManagementResponse,
     CollectionListResponse
 )
@@ -343,3 +345,28 @@ def toggle_item_visibility(
     """
     service = PhotoCollectionService(db)
     return service.toggle_item_visibility(collection_id, current_user.id, position, request.visible)
+
+
+@router.patch(
+    "/{collection_id}/items/{position}/caption",
+    response_model=UpdateCaptionResponse,
+    summary="Update caption of photo item"
+)
+def update_item_caption(
+    collection_id: int,
+    position: int,
+    request: UpdateCaptionRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update caption text for photo item at specific position.
+    
+    - **position**: Index of photo item (0-based)
+    - **caption**: Caption text (max 1000 chars, null to remove)
+    
+    Captions are collection-specific. Same photo can have different captions
+    in different collections. Only photo items can have captions (not text cards).
+    """
+    service = PhotoCollectionService(db)
+    return service.update_item_caption(collection_id, current_user.id, position, request.caption)
